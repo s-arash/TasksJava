@@ -1,0 +1,5 @@
+//rootProject.name = 'tasks'
+//include 'TasksAndroid'
+include 'TasksRx'
+include 'Tasks'
+

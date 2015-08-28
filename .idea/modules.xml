@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/Tasks/Tasks.iml" filepath="$PROJECT_DIR$/Tasks/Tasks.iml" />
+      <module fileurl="file://$PROJECT_DIR$/TasksRx/TasksRx.iml" filepath="$PROJECT_DIR$/TasksRx/TasksRx.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tasks.iml" filepath="$PROJECT_DIR$/tasks.iml" />
+    </modules>
+  </component>
+</project>

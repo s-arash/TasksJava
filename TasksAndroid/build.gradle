@@ -1,0 +1,26 @@
+group 'net.s-arash'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:1.0.0'
+
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+apply plugin: 'com.android.library'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    //testCompile group: 'junit', name: 'junit', version: '4.11'
+    compile 'com.android.support:appcompat-v7:21.0.3'
+    compile project(':Tasks')
+}

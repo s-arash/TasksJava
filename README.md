@@ -1,4 +1,4 @@
-# TasksJava
-A library for simplifying asynchronous programming using promises/futures
+# Tasks
+This is a library for simplifying asynchronous programming in Java using promises/futures.
 
-This library will be populated soon
+For an introduction, take a look at [this introduction page](https://github.com/s-arash/TasksJava/wiki/The-Tasks-Library).

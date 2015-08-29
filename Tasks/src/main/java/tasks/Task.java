@@ -1,5 +1,6 @@
 package tasks;
 
+import java.io.Closeable;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
@@ -110,20 +111,22 @@ public abstract class Task<T> {
 
     /**
      * sync version of {@link #then}
+     *
      * @param continuation the synchronous continuation
      */
-    public final <U> Task<U> thenSync(final Function<? super T,? extends U> continuation) {
+    public final <U> Task<U> thenSync(final Function<? super T, ? extends U> continuation) {
         notNull(continuation, "continuation cannot be null");
         return this.then(new Function<T, Task<U>>() {
             @Override
             public Task<U> call(T x) throws Exception {
-                return Task.fromResult((U)continuation.call(x));
+                return Task.fromResult((U) continuation.call(x));
             }
         });
     }
 
     /**
      * sync version of {@link #then}
+     *
      * @param continuation the void returning synchronous continuation
      */
     public final Task<Void> thenSync(final Action<? super T> continuation) {
@@ -139,9 +142,10 @@ public abstract class Task<T> {
 
     /**
      * This is an alias for {@link #thenSync(Function)}
+     *
      * @see #thenSync(Function)
      */
-    public final <U> Task<U> map(final Function<? super T,? extends U> mapFunction){
+    public final <U> Task<U> map(final Function<? super T, ? extends U> mapFunction) {
         return thenSync(mapFunction);
     }
 
@@ -193,7 +197,7 @@ public abstract class Task<T> {
     /**
      * sync version of {@link #tryCatch}
      */
-    public final Task<T> tryCatchSync(final Function<? super Exception,? extends T> syncCatchBody) {
+    public final Task<T> tryCatchSync(final Function<? super Exception, ? extends T> syncCatchBody) {
         notNull(syncCatchBody, "syncCatchBody cannot be null");
         return this.tryCatch(new Function<Exception, Task<T>>() {
             @Override
@@ -206,7 +210,7 @@ public abstract class Task<T> {
     /**
      * sync version of {@link #tryCatch}
      */
-    public final <TException extends Exception> Task<T> tryCatchSync(final Class<TException> exceptionType, final Function<? super TException,? extends T> syncCatchBody) {
+    public final <TException extends Exception> Task<T> tryCatchSync(final Class<TException> exceptionType, final Function<? super TException, ? extends T> syncCatchBody) {
         notNull(syncCatchBody, "syncCatchBody cannot be null");
         return this.tryCatch(exceptionType, new Function<TException, Task<T>>() {
             @Override
@@ -257,28 +261,58 @@ public abstract class Task<T> {
         });
     }
 
+    /**
+     * returns a Task that closes the given resource after body is done whether successfully or in error. The result of the returned Task will be
+     * the same as the result of body.
+     *
+     * @param resource the given resource that will be closed when body is done
+     * @param body     performs an async operation with resource
+     */
+    public static <T, U extends Closeable> Task<T> tryWithResource(final U resource, final Function<? super U, Task<T>> body) {
+        return TaskUtils.fromFactory(new Callable<Task<T>>() {
+            @Override
+            public Task<T> call() throws Exception {
+                return body.call(resource);
+            }
+        }).continueWith(new Function<Task<T>, Task<T>>() {
+            @Override
+            public Task<T> call(Task<T> bodyTask) throws Exception {
+                try {
+                    if (resource != null) resource.close();
+                } catch (Exception ex) {
+                    if (bodyTask.getException() != null)
+                        return bodyTask;
+                    else
+                        throw ex;
+                }
+                return bodyTask;
+            }
+        });
+    }
+
 
     /**
      * returns a Task that bundles the results of the two tasks together in a {@link Pair}
+     *
      * @return a Task that holds the results of the two tasks in a pair, or an exception if any of the given tasks fails
      */
-    public final <U> Task<Pair<T,U>> zip(final Task<U> other){
-         return Task.whenAny(this,notNull(other,"other cannot be null")).then(new Function<Task<?>, Task<Pair<T, U>>>() {
-             @Override
-             public Task<Pair<T, U>> call(Task<?> task) throws Exception {
-                 if (task.getState() == State.CompletedInError) {
-                     return Task.fromException(task.getException());
-                 } else {
-                     Task<?> unfinished = task == Task.this ? other : Task.this;
-                     return unfinished.then(new Function<Object, Task<Pair<T, U>>>() {
-                         @Override
-                         public Task<Pair<T, U>> call(Object o) throws Exception {
-                             return Task.fromResult(new Pair<T, U>(Task.this.result(), other.result()));
-                         }
-                     });
-                 }
-             }
-         });
+    public final <U> Task<Pair<T, U>> zip(final Task<U> other) {
+        return Task.whenAny(this, notNull(other, "other cannot be null")).then(new Function<Task<?>, Task<Pair<T, U>>>() {
+            @Override
+            public Task<Pair<T, U>> call(Task<?> task) throws Exception {
+                if (task.getState() == State.CompletedInError) {
+                    return Task.fromException(task.getException());
+                } else {
+                    Task<?> unfinished = task == Task.this ? other : Task.this;
+                    return unfinished.then(new Function<Object, Task<Pair<T, U>>>() {
+                        @Override
+                        public Task<Pair<T, U>> call(Object o) throws Exception {
+                            return Task.fromResult(new Pair<T, U>(Task.this.result(), other.result()));
+                        }
+                    });
+                }
+            }
+        });
 
     }
 
@@ -413,7 +447,7 @@ public abstract class Task<T> {
     /**
      * unwraps the wrapped task
      */
-    public static <T> Task<T> unwrap(Task<Task<T>> wrappedTask){
+    public static <T> Task<T> unwrap(Task<Task<T>> wrappedTask) {
         return wrappedTask.then(new Function<Task<T>, Task<T>>() {
             @Override
             public Task<T> call(Task<T> tTask) throws Exception {
@@ -604,6 +638,7 @@ public abstract class Task<T> {
 
     /**
      * the async equivalent of a while(condition){body} loop
+     *
      * @return a Task that is the result of running body as long as condition is true
      */
     public static Task<Void> whileLoop(final Callable<Boolean> condition, final Callable<Task<Void>> body) {
@@ -642,11 +677,11 @@ public abstract class Task<T> {
      * the async equivalent of a do{ body }while(condition); loop
      */
     public static Task<Void> doWhile(final Callable<Task<Void>> body, final Callable<Boolean> condition) {
-        final Ref<Boolean> isFirstRun= new Ref<>(true);
+        final Ref<Boolean> isFirstRun = new Ref<>(true);
         return whileLoop(new Callable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
-                if(isFirstRun.value){
+                if (isFirstRun.value) {
                     isFirstRun.value = false;
                     return true;
                 }

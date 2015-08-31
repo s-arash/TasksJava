@@ -1,11 +1,17 @@
-package tasksandroid;
+package tasks.android;
 
+import android.app.Activity;
+import android.os.Handler;
+import android.os.Looper;
 import java.util.concurrent.Executor;
+import static tasks.ArgumentValidation.notNull;
 
 /**
  * Created by Arash on 8/11/2015.
  */
 public class AndroidExecutors {
+    private static Executor sExecutorFromUiThread;
+
     /**
      * wraps the Handler in an Executor object, useful when using Tasks in android ui
      */

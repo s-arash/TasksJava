@@ -5,6 +5,8 @@ import org.junit.Test;
 
 import static org.junit.Assert.*;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -166,7 +168,7 @@ public class TaskTests  {
         zip.waitForCompletion();
         assertEquals("oh crap!", zip.getException().getMessage());
 
-        assertEquals(new Pair<>(42,"hi"), t1.zip(Task.fromResult("hi")).result());
+        assertEquals(new Pair<>(42, "hi"), t1.zip(Task.fromResult("hi")).result());
     }
 
     @Test
@@ -285,6 +287,60 @@ public class TaskTests  {
         });
         t1.waitForCompletion();
         Assert.assertEquals("Finally blew up!", t1.getException().getMessage());
+    }
+
+    @Test
+    public void testTryWithResource(){
+        //test with failing body
+        final Ref<Integer> closeCalls = new Ref<>(0);
+        Closeable res = new Closeable() {
+            @Override
+            public void close() {
+                closeCalls.value ++;
+            }
+        };
+        Task<Integer> task = Task.tryWithResource(res, new Function<Closeable, Task<Integer>>() {
+            @Override
+            public Task<Integer> call(Closeable closeable) throws Exception {
+                throw new Exception("HEHE");
+            }
+        });
+        task.waitForCompletion();
+        assertTrue(task.getException().getMessage().equals("HEHE"));
+        assertEquals((Integer)1, closeCalls.value);
+
+
+        //test with resource that throws in close()
+        Closeable badRes = new Closeable() {
+            @Override
+            public void close() throws IOException {
+                throw new IOException("From badRes");
+            }
+        };
+        Task<Integer> taskWithBadRes = Task.tryWithResource(badRes, new Function<Closeable, Task<Integer>>() {
+            @Override
+            public Task<Integer> call(Closeable closeable) throws Exception {
+                return Task.delay(5).thenSync(new Function<Void, Integer>() {
+                    @Override
+                    public Integer call(Void aVoid) throws Exception {
+                        return 42;
+                    }
+                });
+            }
+        });
+        taskWithBadRes.waitForCompletion();
+        assertEquals("From badRes", taskWithBadRes.getException().getMessage());
+
+        //test with failing body and resource that throws in close(). the returned Task's exception must come from body
+        Task<Integer> badTaskWithBadRes = Task.tryWithResource(badRes, new Function<Closeable, Task<Integer>>() {
+            @Override
+            public Task<Integer> call(Closeable closeable) throws Exception {
+                return Task.fromException(new Exception("from badTask"));
+            }
+        });
+        badTaskWithBadRes.waitForCompletion();
+        assertEquals("from badTask", badTaskWithBadRes.getException().getMessage());
+
     }
 
     @Test

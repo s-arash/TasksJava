@@ -18,7 +18,7 @@ import java.util.concurrent.Executors;
  * unit tests for the tasks library
  */
 
-public class TaskTests  {
+public class TaskTests {
     @Test
     public void testDelay() throws Exception {
         long start = System.nanoTime();
@@ -34,6 +34,7 @@ public class TaskTests  {
         Assert.assertTrue(delayTask.isDone());
         Assert.assertTrue(end.value - start >= 1000000 * 390);
     }
+
     @Test
     public void testThen() throws Exception {
         Task<Integer> t1 = Task.delay(30).then(new Function<Void, Task<Integer>>() {
@@ -44,6 +45,7 @@ public class TaskTests  {
         });
         Assert.assertEquals(66, (int) t1.result());
     }
+
     @Test
     public void testWhenAny() throws Exception {
         Task<Void> t1 = Task.delay(100);
@@ -57,6 +59,7 @@ public class TaskTests  {
         Assert.assertEquals(Task.State.CompletedSuccessfully, first.result().getState());
         Assert.assertFalse(t4.isDone());
     }
+
     @Test
     public void testWhenAnySucceeds() throws Exception {
         Task<Void> t1 = Task.fromException(new Exception("OOPS!"));
@@ -77,6 +80,7 @@ public class TaskTests  {
         Assert.assertFalse(t4.isDone());
 
     }
+
     @Test
     public void testWhenAnySucceeds2() throws Exception {
         Task<Void> t1 = Task.fromException(new Exception("OOPS!"));
@@ -100,6 +104,7 @@ public class TaskTests  {
         Assert.assertTrue(t2.isDone());
         Assert.assertTrue(t3.isDone());
     }
+
     @Test
     public void testWhenAnyAndWhenAll() throws Exception {
         Task<Void> tMother = Task.delay(10).then(new Function<Void, Task<Void>>() {
@@ -154,7 +159,7 @@ public class TaskTests  {
     }
 
     @Test
-    public void testZip() throws Exception{
+    public void testZip() throws Exception {
         Task<Integer> t1 = Task.delay(10).map(new Function<Void, Integer>() {
             @Override
             public Integer call(Void aVoid) throws Exception {
@@ -232,12 +237,12 @@ public class TaskTests  {
     @Test
     public void testTryCatch3() throws Exception {
         Task<Integer> t0 = Task.<Integer>fromException(new IllegalArgumentException("yup, somebody threw me"))
-                .tryCatch(ArithmeticException.class, new Function<ArithmeticException, Task<Integer>>() {
-                    @Override
-                    public Task<Integer> call(ArithmeticException x) throws Exception {
-                        return Task.fromResult(666);
-                    }
-                });
+            .tryCatch(ArithmeticException.class, new Function<ArithmeticException, Task<Integer>>() {
+                @Override
+                public Task<Integer> call(ArithmeticException x) throws Exception {
+                    return Task.fromResult(666);
+                }
+            });
         final Task<Integer> t1 = t0.tryCatch(IllegalArgumentException.class, new Function<IllegalArgumentException, Task<Integer>>() {
             @Override
             public Task<Integer> call(IllegalArgumentException x) throws Exception {
@@ -262,13 +267,13 @@ public class TaskTests  {
     public void testTryFinally() throws Exception {
         final Ref<Boolean> ranFinally = new Ref<>(false);
         Task<Integer> t0 = Task.<Integer>fromException(new IllegalArgumentException("yup, somebody threw me"))
-                .tryFinally(new Function<Void, Task<Void>>() {
-                    @Override
-                    public Task<Void> call(Void x) throws Exception {
-                        ranFinally.value = true;
-                        return Task.fromResult(null);
-                    }
-                });
+            .tryFinally(new Function<Void, Task<Void>>() {
+                @Override
+                public Task<Void> call(Void x) throws Exception {
+                    ranFinally.value = true;
+                    return Task.fromResult(null);
+                }
+            });
         t0.waitForCompletion();
         Assert.assertEquals(Task.State.CompletedInError, t0.getState());
         Assert.assertTrue(ranFinally.value);
@@ -290,13 +295,13 @@ public class TaskTests  {
     }
 
     @Test
-    public void testTryWithResource(){
+    public void testTryWithResource() {
         //test with failing body
         final Ref<Integer> closeCalls = new Ref<>(0);
         Closeable res = new Closeable() {
             @Override
             public void close() {
-                closeCalls.value ++;
+                closeCalls.value++;
             }
         };
         Task<Integer> task = Task.tryWithResource(res, new Function<Closeable, Task<Integer>>() {
@@ -307,7 +312,7 @@ public class TaskTests  {
         });
         task.waitForCompletion();
         assertTrue(task.getException().getMessage().equals("HEHE"));
-        assertEquals((Integer)1, closeCalls.value);
+        assertEquals((Integer) 1, closeCalls.value);
 
 
         //test with resource that throws in close()
@@ -340,7 +345,25 @@ public class TaskTests  {
         });
         badTaskWithBadRes.waitForCompletion();
         assertEquals("from badTask", badTaskWithBadRes.getException().getMessage());
+    }
 
+    @Test
+    public void testWithTimeout() throws Exception {
+        Task<Void> task = Task.delay(10000);
+        Task<Void> taskWithTimeOut = task.withTimeout(10);
+        taskWithTimeOut.waitForCompletion();
+        assertTrue(taskWithTimeOut.getException() instanceof TaskTimeoutException
+            && ((TaskTimeoutException) taskWithTimeOut.getException()).getTimedOutTask() == task);
+
+        Task<Integer> task2 = Task.delay(10).thenSync(new Function<Void, Integer>() {
+            @Override
+            public Integer call(Void aVoid) throws Exception {
+                return 42;
+            }
+        });
+        Task<Integer> task2WithTimeOut = task2.withTimeout(20);
+        task2WithTimeOut.waitForCompletion();
+        assertEquals((Integer)42, task2WithTimeOut.result());
     }
 
     @Test
@@ -372,24 +395,24 @@ public class TaskTests  {
         final Ref<Integer> res = new Ref<>(0);
 
         final Task<Void> t =
-                Task.whileLoop(new Callable<Boolean>() {
-                                   @Override
-                                   public Boolean call() throws Exception {
-                                       return i.value <= 10;
-                                   }
-                               },
-                        new Callable<Task<Void>>() {
+            Task.whileLoop(new Callable<Boolean>() {
+                               @Override
+                               public Boolean call() throws Exception {
+                                   return i.value <= 10;
+                               }
+                           },
+                new Callable<Task<Void>>() {
+                    @Override
+                    public Task<Void> call() throws Exception {
+                        return Task.delay(5).thenSync(new Action<Void>() {
                             @Override
-                            public Task<Void> call() throws Exception {
-                                return Task.delay(5).thenSync(new Action<Void>() {
-                                    @Override
-                                    public void call(Void x) throws Exception {
-                                        res.value += i.value;
-                                        i.value++;
-                                    }
-                                });
+                            public void call(Void x) throws Exception {
+                                res.value += i.value;
+                                i.value++;
                             }
                         });
+                    }
+                });
 
         t.result();
         Assert.assertEquals(10 * 11 / 2, (int) res.value);
@@ -400,7 +423,7 @@ public class TaskTests  {
         Task<Integer> t1 = Task.delay(30).continueWithSync(new Function<Task<Void>, Integer>() {
             @Override
             public Integer call(Task<Void> x) throws Exception {
-                if(x.getState() == Task.State.CompletedInError){
+                if (x.getState() == Task.State.CompletedInError) {
                     throw x.getException();
                 }
                 return 66;
@@ -416,7 +439,7 @@ public class TaskTests  {
         }).continueWith(new Function<Task<Integer>, Task<Integer>>() {
             @Override
             public Task<Integer> call(Task<Integer> x) throws Exception {
-                if(x.getState() == Task.State.CompletedInError){
+                if (x.getState() == Task.State.CompletedInError) {
                     return Task.fromResult(42);
                 }
                 return Task.fromResult(9);
@@ -470,7 +493,7 @@ public class TaskTests  {
                     whatWentWrong.value = ex;
                 }
                 return
-                        Task.fromResult(42);
+                    Task.fromResult(42);
             }
         }).result();
 

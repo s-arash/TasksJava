@@ -326,6 +326,31 @@ public abstract class Task<T> {
         return tmc.getTask();
     }
 
+    /**
+     * returns a Task that, if this Task does not complete in the amount of time given by {timeout} and {timeUnit}, fails with a {@link TaskTimeoutException}
+     * @param timeout the amount of time to wait before waiting with a {@link TaskTimeoutException}
+     * @param timeUnit the unit of {timeout}
+     */
+    public final Task<T> withTimeout(final long timeout, final TimeUnit timeUnit) {
+        return Task.whenAny(this, Task.delay(timeout, timeUnit)).then(new Function<Task<?>, Task<T>>() {
+            @Override
+            public Task<T> call(Task<?> task) throws Exception {
+                if (task == Task.this)
+                    return Task.this;
+                else
+                    return Task.fromException(new TaskTimeoutException(Task.this, String.format("a task didn't finish in %d %s", timeout, timeUnit.name())));
+            }
+        }).continueOn(Task.this.getContinuationExecutor());
+    }
+
+    /**
+     * returns a Task that, if this Task does not complete in the amount of time given by {timeoutMillis}, fails with a {@link TaskTimeoutException}
+     * @param timeoutMillis the amount of time to wait before waiting with a {@link TaskTimeoutException}
+     */
+    public final Task<T> withTimeout(final long timeoutMillis) {
+        return withTimeout(timeoutMillis, TimeUnit.MILLISECONDS);
+    }
+
     protected Executor getContinuationExecutor() {
         return TaskSharedStuff.defaultExecutor;
     }
@@ -333,7 +358,7 @@ public abstract class Task<T> {
     /**
      * returns the value computed by the task, or in the case of a Task completed in error, throws the exception.
      * If the task isn't completed yet, blocks the current thread until it completes.
-     * NOTE: use this method with caution, if the Task's completion depends on running code on the current thread's
+     * NOTE: Use this method with caution, if the Task's completion depends on running code on the current thread's
      * message queue, calling this method results in a deadlock
      */
     public abstract T result() throws Exception;
@@ -372,6 +397,8 @@ public abstract class Task<T> {
     public final Future<T> asFuture() {
         return new TaskFuture.FutureFromTask<T>(this);
     }
+
+
     //--------------Factory methods----------------
 
     /**

@@ -22,9 +22,13 @@ task sourcesJar(type: Jar) {
 artifacts {
     archives javadocJar, sourcesJar
 }
+signing {
+    sign configurations.archives
+}
+
 group = "net.s-arash"
 archivesBaseName = "tasks"
-version = "0.1.0-SNAPSHOT"
+version = "0.1.0-beta01"
 
 uploadArchives {
     repositories {

@@ -37,3 +37,74 @@ dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.11'
     compile project (':Tasks')
 }
+
+apply plugin: 'maven'
+apply plugin: 'signing'
+
+//task javadocJar(type: Jar) {
+//    classifier = 'javadoc'
+//    from javadoc
+//}
+//
+//task sourcesJar(type: Jar) {
+//    classifier = 'sources'
+//    from sourceSets.main.allSource
+//}
+//artifacts {
+//    archives javadocJar, sourcesJar
+//}
+
+signing {
+    sign configurations.archives
+}
+
+
+apply from:"artifacts.gradle"
+group = "net.s-arash"
+archivesBaseName = "tasksandroid"
+version = "0.1.0-beta01"
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            pom.project {
+                name 'TasksAndroid'
+                packaging 'aar'
+                // optionally artifactId can be defined here
+                description 'A utility library for using TaskJava in Android'
+                url 'https://github.com/s-arash/TasksJava'
+
+                scm {
+                    connection 'https://github.com/s-arash/TasksJava.git'
+                    developerConnection 'https://github.com/s-arash/TasksJava'
+                    url 'https://github.com/s-arash/TasksJava'
+                }
+
+                licenses {
+                    license {
+                        name 'The MIT License (MIT)'
+                        url 'http://opensource.org/licenses/MIT'
+                    }
+                }
+
+                developers {
+                    developer {
+                        //id 'arash.sahebolamri'
+                        name 'Arash Sahebolamri'
+                        email 'arash.sahebolamri@gmail.com'
+                    }
+                }
+            }
+        }
+    }
+}

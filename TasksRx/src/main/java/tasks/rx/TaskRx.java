@@ -1,4 +1,4 @@
-package tasksrx;
+package tasks.rx;
 
 import rx.Observable;
 import rx.Observer;
@@ -7,10 +7,10 @@ import rx.Subscription;
 import tasks.*;
 
 import static tasks.ArgumentValidation.notNull;
+
 /**
 * This class contains helper methods for converting Tasks to Observables and vice versa
 */
-
 public class TaskRx {
     /**
      * creates a Task that subscribes to the given observable, and completes on the first item emitted by the Observable

@@ -1,8 +1,4 @@
-package tasksrx;
-import rx.Observable;
-import rx.Observer;
-import rx.Subscriber;
-import rx.Subscription;
+package tasks.rx;
 import rx.functions.*;
 import tasks.Action;
 

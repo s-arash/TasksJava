@@ -1,15 +1,13 @@
-package tasksrx;
+package tasks.rx;
 
 import org.junit.Test;
 import rx.Notification;
 import rx.Observable;
 import rx.functions.Func1;
-import rx.observables.BlockingObservable;
 import tasks.Function;
 import tasks.Task;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;

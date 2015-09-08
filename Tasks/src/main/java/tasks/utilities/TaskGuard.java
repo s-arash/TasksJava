@@ -1,14 +1,10 @@
 package tasks.utilities;
 
-import net.denavas.tasks.Task;
-import net.denavas.tasks.TaskUtils;
 
-import java.util.EnumSet;
+import tasks.Task;
+import tasks.TaskUtils;
+
 import java.util.concurrent.Callable;
-
-/**
- * Created by sahebolamri on 5/25/2015.
- */
 
 /**
  * Use this class to wrap task returning code that you don't want to run concurrently.

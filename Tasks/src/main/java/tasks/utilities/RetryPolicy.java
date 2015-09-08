@@ -1,16 +1,12 @@
 package tasks.utilities;
 
-import net.denavas.tasks.Function;
-import net.denavas.tasks.Ref;
-import net.denavas.tasks.Task;
-import net.denavas.tasks.TaskUtils;
+import tasks.Function;
+import tasks.Ref;
+import tasks.Task;
+import tasks.TaskUtils;
+import tasks.internal.Utils;
 
-import java.util.Arrays;
 import java.util.concurrent.Callable;
-
-/**
- * Created by Arash on 6/10/2015.
- */
 
 
 public abstract class RetryPolicy {
@@ -132,7 +128,7 @@ public abstract class RetryPolicy {
                 try {
                     return shouldHandle.call(ex);
                 } catch (Exception thrownException) {
-                    throw TaskUtils.getRuntimeException(thrownException);
+                    throw Utils.getRuntimeException(thrownException);
                 }
             }
         };
@@ -165,7 +161,7 @@ public abstract class RetryPolicy {
                 try {
                     return shouldHandle.call(ex);
                 } catch (Exception thrownException) {
-                    throw TaskUtils.getRuntimeException(thrownException);
+                    throw Utils.getRuntimeException(thrownException);
                 }
             }
 
@@ -174,7 +170,7 @@ public abstract class RetryPolicy {
                 try {
                     return waitTimeFunc.call(attemptNo);
                 } catch (Exception e) {
-                    throw TaskUtils.getRuntimeException(e);
+                    throw Utils.getRuntimeException(e);
                 }
             }
         };

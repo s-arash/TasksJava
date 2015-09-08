@@ -1,8 +1,5 @@
 package tasks.utilities;
 
-/**
- * Created by sahebolamri on 8/8/2015.
- */
 public class EssentialUtils {
     /**
      * if o is of the given type, returns o cast to it; otherwise returns null.

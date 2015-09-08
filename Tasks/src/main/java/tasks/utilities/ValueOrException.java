@@ -1,8 +1,5 @@
 package tasks.utilities;
 
-/**
- * Created by sahebolamri on 3/7/2015.
- */
 public class ValueOrException<T> {
 
     final private T mValue;

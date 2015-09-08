@@ -1,15 +1,16 @@
 package tasks.utilities;
 
-import junit.framework.Assert;
-import junit.framework.TestCase;
+import org.junit.Assert;
+import org.junit.Test;
+import tasks.Ref;
+import tasks.Task;
 
-import net.denavas.tasks.Ref;
-import net.denavas.tasks.Task;
 
 import java.util.concurrent.Callable;
 
-public class TaskCacheTest extends TestCase {
+public class TaskCacheTest {
 
+    @Test
     public void testTaskCache() throws Exception {
         final Ref<Integer> count = new Ref<Integer>(0);
         TaskCache<Integer> taskCache = new TaskCache<>(new Callable<Task<Integer>>() {
@@ -27,7 +28,7 @@ public class TaskCacheTest extends TestCase {
 
         Task<Integer> t1 = taskCache.get();
         Task<Integer> t2 = taskCache.get();
-        Assert.assertSame(t1,t2);
+        Assert.assertSame(t1, t2);
 
         t1.result();
         Task<Integer> t3 = taskCache.get();
@@ -39,7 +40,7 @@ public class TaskCacheTest extends TestCase {
         Assert.assertNotSame(t1,t4);
         Assert.assertEquals((Integer)1,t4.result());
     }
-
+    @Test
     public void testTaskCacheWithNoResultCache() throws Exception {
         final Ref<Integer> count = new Ref<Integer>(0);
         TaskCache<Integer> taskCache = new TaskCache<>(new Callable<Task<Integer>>() {

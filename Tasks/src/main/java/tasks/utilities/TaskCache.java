@@ -1,23 +1,20 @@
 package tasks.utilities;
 
-import net.denavas.tasks.Function;
-import net.denavas.tasks.Task;
-import net.denavas.tasks.TaskUtils;
-
-import org.apache.commons.lang3.time.StopWatch;
-
-import java.util.EnumSet;
+import tasks.Function;
+import tasks.Task;
+import tasks.TaskUtils;
 import java.util.concurrent.Callable;
 
 /**
- * Created by sahebolamri on 5/27/2015.
+ * Use this class to cache results of async ({@link Task} returning) computations
  */
 public class TaskCache<T> {
     private final Callable<Task<T>> mTaskFactory;
     private final long mCacheTtl;
     private final long mErrorCacheTtl;
     private Task<T> mTask;
-    private StopWatch mStopWatch;
+    private long taskCompletionTimeNano;
+
 
     /**
      * creates a new instance of TaskCache
@@ -29,9 +26,11 @@ public class TaskCache<T> {
         this.mCacheTtl = cacheTtlMilliseconds;
         this.mErrorCacheTtl = errorCacheTtlMilliseconds;
         this.mTaskFactory = taskFactory;
-        this.mStopWatch = new StopWatch();
     }
 
+    /**
+     * @return the taskFactory provided to this {@link TaskCache} instance
+     */
     public Callable<Task<T>> getTaskFactory() {
         return mTaskFactory;
     }
@@ -42,35 +41,37 @@ public class TaskCache<T> {
             @Override
             public Task<T> call(Task<T> x) throws Exception {
                 synchronized (TaskCache.this) {
-                    mStopWatch.reset();
-                    mStopWatch.start();
+                    taskCompletionTimeNano = System.nanoTime();
                     return x;
                 }
             }
         });
     }
 
+    /**
+     * @return returns a possibly cached {@link Task} object created by the taskFactory.
+     */
     public synchronized Task<T> get() {
         if (this.mTask == null) {
             this.mTask = createTask();
+            return mTask;
         } else if (mTask.getState() == Task.State.NotCompleted) {
             return mTask;
-        } else if (mTask.getState() == Task.State.CompletedSuccessfully && (mCacheTtl < 0 || mStopWatch.getNanoTime() <= mCacheTtl * 1000000)) {
+        } else if (mTask.getState() == Task.State.CompletedSuccessfully && (mCacheTtl < 0 || System.nanoTime() - taskCompletionTimeNano <= mCacheTtl * 1000000)) {
             return mTask;
-        } else if (mTask.getState() == Task.State.CompletedInError && (mCacheTtl < 0 || mStopWatch.getNanoTime() <= mErrorCacheTtl * 1000000)) {
+        } else if (mTask.getState() == Task.State.CompletedInError && (mErrorCacheTtl < 0 || System.nanoTime() - taskCompletionTimeNano <= mErrorCacheTtl * 1000000)) {
             return mTask;
         } else {
             this.mTask = createTask();
+            return mTask;
         }
-
-        return mTask;
     }
 
+    /**
+     * resets this {@link TaskCache} instance, so a subsequent call to {@link #get()} results in creating a new {@link Task} from the provided taskFactory.
+     */
     public void Reset() {
         this.mTask = null;
     }
 
-    public enum Options {
-        DoNotCacheResult,
-    }
 }

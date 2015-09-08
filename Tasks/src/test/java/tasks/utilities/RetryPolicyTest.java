@@ -1,18 +1,18 @@
 package tasks.utilities;
 
-import junit.framework.Assert;
-import junit.framework.TestCase;
-
-import net.denavas.tasks.Function;
-import net.denavas.tasks.Ref;
-import net.denavas.tasks.Task;
 
 import org.apache.commons.lang3.time.StopWatch;
+import org.junit.Test;
+import tasks.Function;
+import tasks.Ref;
+import tasks.Task;
 
 import java.util.Random;
 import java.util.concurrent.Callable;
 
-public class RetryPolicyTest extends TestCase {
+import static org.junit.Assert.*;
+
+public class RetryPolicyTest {
 
     static Callable<Task<Integer>> createFlakyTaskFactory(int throwCount, final Callable<Exception> exceptionFactory){
         final Ref<Integer> remainingThrows = new Ref<>(throwCount);
@@ -32,6 +32,8 @@ public class RetryPolicyTest extends TestCase {
             }
         };
     }
+
+    @Test
     public void testRun() throws Exception{
         RetryPolicy retryPolicy = RetryPolicy.create(NumberFormatException.class, 2, 66);
         final Ref<Integer> remainingThrows = new Ref<>(2);
@@ -48,8 +50,10 @@ public class RetryPolicyTest extends TestCase {
             }
         });
         stopWatch.stop();
-        Assert.assertTrue( stopWatch.getTime() >= 2 * 66);
+        assertTrue(stopWatch.getTime() >= 2 * 66);
     }
+
+    @Test
     public void testRunAsync() throws Exception {
         RetryPolicy retryPolicy = RetryPolicy.create(NumberFormatException.class, 2, 50);
         Callable<Exception> numberFormatExceptionFactory = new Callable<Exception>() {
@@ -69,24 +73,25 @@ public class RetryPolicyTest extends TestCase {
 
         Task<Integer> t1 = retryPolicy.runAsync(createFlakyTaskFactory(1, numberFormatExceptionFactory));
         t1.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedSuccessfully,t1.getState());
+        assertEquals(Task.State.CompletedSuccessfully, t1.getState());
 
         Task<Integer> t2 = retryPolicy.runAsync(createFlakyTaskFactory(2, numberFormatExceptionFactory));
         t2.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedSuccessfully,t2.getState());
+        assertEquals(Task.State.CompletedSuccessfully, t2.getState());
 
         Task<Integer> t3 = retryPolicy.runAsync(createFlakyTaskFactory(3, numberFormatExceptionFactory));
         t3.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedInError,t3.getState());
-        Assert.assertTrue(t3.getException() instanceof NumberFormatException);
+        assertEquals(Task.State.CompletedInError, t3.getState());
+        assertTrue(t3.getException() instanceof NumberFormatException);
 
         Task<Integer> t4 = retryPolicy.runAsync(createFlakyTaskFactory(1, illegalStateExceptionFactory));
         t4.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedInError,t4.getState());
-        Assert.assertTrue(t4.getException() instanceof IllegalStateException);
+        assertEquals(Task.State.CompletedInError, t4.getState());
+        assertTrue(t4.getException() instanceof IllegalStateException);
 
     }
 
+    @Test
     public void testCombine() throws Exception {
         RetryPolicy retryPolicy = RetryPolicy.create(NumberFormatException.class, 2, 50).combine(RetryPolicy.create(TypeNotPresentException.class,4,30));
         final Exception[] exceptions = {
@@ -108,17 +113,17 @@ public class RetryPolicyTest extends TestCase {
 
         Task<Integer> t1 = retryPolicy.runAsync(createFlakyTaskFactory(5, exceptionFactory));
         t1.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedSuccessfully, t1.getState());
+        assertEquals(Task.State.CompletedSuccessfully, t1.getState());
         exceptionCounter.value = 0;
 
         Task<Integer> t2 = retryPolicy.runAsync(createFlakyTaskFactory(6, exceptionFactory));
         t2.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedSuccessfully, t2.getState());
+        assertEquals(Task.State.CompletedSuccessfully, t2.getState());
         exceptionCounter.value = 0;
 
         Task<Integer> t3 = retryPolicy.runAsync(createFlakyTaskFactory(7, exceptionFactory));
         t3.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedInError, t3.getState());
+        assertEquals(Task.State.CompletedInError, t3.getState());
         exceptionCounter.value = 0;
 
     }

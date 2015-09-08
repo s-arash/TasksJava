@@ -1,7 +1,9 @@
 package tasks.utilities;
 
 /**
- * Created by sahebolamri on 2/28/2015.
+ * It's a sum type, meaning either case1 has a value, or case2.
+ * @param <T1>
+ * @param <T2>
  */
 public class Either<T1, T2> {
     private T1 case1Item;
@@ -34,14 +36,14 @@ public class Either<T1, T2> {
         if (isCase1) {
             return case1Item;
         } else {
-            throw new UnsupportedOperationException("this Either has value for case 2");
+            throw new IllegalStateException("this Either has value for case 2");
         }
     }
     public T2 getCase2() {
         if (!isCase1) {
             return case2Item;
         } else {
-            throw new UnsupportedOperationException("this Either has value for case 1");
+            throw new IllegalStateException("this Either has value for case 1");
         }
     }
 

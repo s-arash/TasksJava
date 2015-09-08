@@ -64,6 +64,9 @@ group = "net.s-arash"
 archivesBaseName = "tasksandroid"
 version = "0.1.0-beta01"
 
+tasks['uploadArchives'].onlyIf { project.hasProperty('signing.keyId')}
+tasks['signArchives'].onlyIf { project.hasProperty('signing.keyId')}
+
 uploadArchives {
     repositories {
         mavenDeployer {

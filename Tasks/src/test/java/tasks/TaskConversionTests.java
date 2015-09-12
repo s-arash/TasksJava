@@ -52,7 +52,7 @@ public class TaskConversionTests  {
                 return 42;
             }
         });
-        Future<Integer> future = task.asFuture();
+        Future<Integer> future = task.toFuture();
         Assert.assertEquals((Integer) 42, future.get());
 
 
@@ -62,7 +62,7 @@ public class TaskConversionTests  {
                 throw new IllegalAccessException("what?");
             }
         });
-        Future<Integer> faultingFuture = faultingTask.asFuture();
+        Future<Integer> faultingFuture = faultingTask.toFuture();
         try {
             faultingFuture.get();
             Assert.fail("should have thrown");
@@ -76,7 +76,7 @@ public class TaskConversionTests  {
                 return 666;
             }
         });
-        Future<Integer> longRunningFuture = longRunningTask.asFuture();
+        Future<Integer> longRunningFuture = longRunningTask.toFuture();
         try {
             longRunningFuture.get(50, TimeUnit.MILLISECONDS);
             Assert.fail("should have thrown");

@@ -27,7 +27,7 @@ public class TaskRxTests {
         return res;
     }
 
-    @Test(timeout = 100)
+    @Test(timeout = 200)
     public void testFromObservable() throws Exception {
         Observable<Integer> observable = Observable.just(0L).concatWith(Observable.interval(100, TimeUnit.HOURS)).flatMap(new Func1<Long, Observable<Integer>>() {
             @Override

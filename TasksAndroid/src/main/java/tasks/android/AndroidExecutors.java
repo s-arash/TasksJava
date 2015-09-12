@@ -6,9 +6,7 @@ import android.os.Looper;
 import java.util.concurrent.Executor;
 import static tasks.ArgumentValidation.notNull;
 
-/**
- * Created by Arash on 8/11/2015.
- */
+
 public class AndroidExecutors {
     /**
      * wraps the Handler in an Executor object

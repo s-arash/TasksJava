@@ -1,4 +1,4 @@
-package tasks.utilities;
+package tasks.experimental.utilities;
 
 import tasks.Function;
 import tasks.Task;
@@ -55,11 +55,11 @@ public class TaskCache<T> {
         if (this.mTask == null) {
             this.mTask = createTask();
             return mTask;
-        } else if (mTask.getState() == Task.State.NotCompleted) {
+        } else if (mTask.getState() == Task.State.NotDone) {
             return mTask;
-        } else if (mTask.getState() == Task.State.CompletedSuccessfully && (mCacheTtl < 0 || System.nanoTime() - taskCompletionTimeNano <= mCacheTtl * 1000000)) {
+        } else if (mTask.getState() == Task.State.Succeeded && (mCacheTtl < 0 || System.nanoTime() - taskCompletionTimeNano <= mCacheTtl * 1000000)) {
             return mTask;
-        } else if (mTask.getState() == Task.State.CompletedInError && (mErrorCacheTtl < 0 || System.nanoTime() - taskCompletionTimeNano <= mErrorCacheTtl * 1000000)) {
+        } else if (mTask.getState() == Task.State.Failed && (mErrorCacheTtl < 0 || System.nanoTime() - taskCompletionTimeNano <= mErrorCacheTtl * 1000000)) {
             return mTask;
         } else {
             this.mTask = createTask();

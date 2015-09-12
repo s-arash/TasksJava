@@ -56,7 +56,7 @@ public class TaskTests {
         Task<Task<?>> first = Task.whenAny(t4, t2, t1, t3);
 
         Assert.assertEquals(t1, first.result());
-        Assert.assertEquals(Task.State.CompletedSuccessfully, first.result().getState());
+        Assert.assertEquals(Task.State.Succeeded, first.result().getState());
         Assert.assertFalse(t4.isDone());
     }
 
@@ -76,7 +76,7 @@ public class TaskTests {
         Task<Task<?>> first = Task.whenAnySucceeds(t5, t4, t2, t1, t3);
 
         Assert.assertEquals(t3, first.result());
-        Assert.assertEquals(Task.State.CompletedSuccessfully, first.result().getState());
+        Assert.assertEquals(Task.State.Succeeded, first.result().getState());
         Assert.assertFalse(t4.isDone());
 
     }
@@ -100,7 +100,7 @@ public class TaskTests {
         Task<Task<?>> first = Task.whenAnySucceeds(t2, t1, t3);
 
         first.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedInError, first.getState());
+        Assert.assertEquals(Task.State.Failed, first.getState());
         Assert.assertTrue(t2.isDone());
         Assert.assertTrue(t3.isDone());
     }
@@ -146,12 +146,12 @@ public class TaskTests {
         Task<Task<?>> first = Task.whenAny(tBad, t2, t1, t3);
 
         Assert.assertEquals(t1, first.result());
-        Assert.assertEquals(Task.State.CompletedSuccessfully, first.result().getState());
+        Assert.assertEquals(Task.State.Succeeded, first.result().getState());
         Assert.assertFalse(tBad.isDone());
 
 
         final Task<?>[] whenAllResult = Task.whenAll(t3, t2, t1, tBad).result();
-        Assert.assertEquals(Task.State.CompletedInError, whenAllResult[3].getState());
+        Assert.assertEquals(Task.State.Failed, whenAllResult[3].getState());
 
         for (Task<Void> t : new Task[]{t1, t2, t3, tBad}) {
             Assert.assertTrue(t.isDone());
@@ -192,17 +192,17 @@ public class TaskTests {
         });
 
         Thread.sleep(30);
-        Assert.assertEquals("t0 should be in error state", Task.State.CompletedInError, t0.getState());
-        //Assert.assertEquals("t1 should be done", Task.State.CompletedSuccessfully, t1.getState());
+        Assert.assertEquals("t0 should be in error state", Task.State.Failed, t0.getState());
+        //Assert.assertEquals("t1 should be done", Task.State.Succeeded, t1.getState());
         t1.result();
     }
 
     @Test
     public void testTryCatch() throws Exception {
 
-        TaskManualCompletion<Integer> tmc = new TaskManualCompletion<>();
-        tmc.setException(new Exception(":]"));
-        Task<Integer> t0 = tmc.getTask().tryCatch(new Function<Exception, Task<Integer>>() {
+        TaskBuilder<Integer> taskBuilder = new TaskBuilder<>();
+        taskBuilder.setException(new Exception(":]"));
+        Task<Integer> t0 = taskBuilder.getTask().tryCatch(new Function<Exception, Task<Integer>>() {
             @Override
             public Task<Integer> call(Exception arg) throws Exception {
                 return Task.fromResult(42);
@@ -257,7 +257,7 @@ public class TaskTests {
         });
 
         t0.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedInError, t0.getState());
+        Assert.assertEquals(Task.State.Failed, t0.getState());
 
         Assert.assertEquals(4, (int) t1.result());
         Assert.assertEquals(5, (int) t2.result());
@@ -275,7 +275,7 @@ public class TaskTests {
                 }
             });
         t0.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedInError, t0.getState());
+        Assert.assertEquals(Task.State.Failed, t0.getState());
         Assert.assertTrue(ranFinally.value);
 
 
@@ -381,7 +381,7 @@ public class TaskTests {
             }
         });
 
-        Assert.assertEquals(Task.State.NotCompleted, t.getState());
+        Assert.assertEquals(Task.State.NotDone, t.getState());
         final List<Integer> result = t.result();
         for (int i = 0; i < input.size(); i++) {
             Assert.assertEquals(input.get(i) * input.get(i), (int) result.get(i));
@@ -423,7 +423,7 @@ public class TaskTests {
         Task<Integer> t1 = Task.delay(30).continueWithSync(new Function<Task<Void>, Integer>() {
             @Override
             public Integer call(Task<Void> x) throws Exception {
-                if (x.getState() == Task.State.CompletedInError) {
+                if (x.getState() == Task.State.Failed) {
                     throw x.getException();
                 }
                 return 66;
@@ -439,7 +439,7 @@ public class TaskTests {
         }).continueWith(new Function<Task<Integer>, Task<Integer>>() {
             @Override
             public Task<Integer> call(Task<Integer> x) throws Exception {
-                if (x.getState() == Task.State.CompletedInError) {
+                if (x.getState() == Task.State.Failed) {
                     return Task.fromResult(42);
                 }
                 return Task.fromResult(9);

@@ -1,4 +1,4 @@
-package tasks.utilities;
+package tasks.experimental.utilities;
 
 
 import org.apache.commons.lang3.time.StopWatch;
@@ -73,20 +73,20 @@ public class RetryPolicyTest {
 
         Task<Integer> t1 = retryPolicy.runAsync(createFlakyTaskFactory(1, numberFormatExceptionFactory));
         t1.waitForCompletion();
-        assertEquals(Task.State.CompletedSuccessfully, t1.getState());
+        assertEquals(Task.State.Succeeded, t1.getState());
 
         Task<Integer> t2 = retryPolicy.runAsync(createFlakyTaskFactory(2, numberFormatExceptionFactory));
         t2.waitForCompletion();
-        assertEquals(Task.State.CompletedSuccessfully, t2.getState());
+        assertEquals(Task.State.Succeeded, t2.getState());
 
         Task<Integer> t3 = retryPolicy.runAsync(createFlakyTaskFactory(3, numberFormatExceptionFactory));
         t3.waitForCompletion();
-        assertEquals(Task.State.CompletedInError, t3.getState());
+        assertEquals(Task.State.Failed, t3.getState());
         assertTrue(t3.getException() instanceof NumberFormatException);
 
         Task<Integer> t4 = retryPolicy.runAsync(createFlakyTaskFactory(1, illegalStateExceptionFactory));
         t4.waitForCompletion();
-        assertEquals(Task.State.CompletedInError, t4.getState());
+        assertEquals(Task.State.Failed, t4.getState());
         assertTrue(t4.getException() instanceof IllegalStateException);
 
     }
@@ -113,17 +113,17 @@ public class RetryPolicyTest {
 
         Task<Integer> t1 = retryPolicy.runAsync(createFlakyTaskFactory(5, exceptionFactory));
         t1.waitForCompletion();
-        assertEquals(Task.State.CompletedSuccessfully, t1.getState());
+        assertEquals(Task.State.Succeeded, t1.getState());
         exceptionCounter.value = 0;
 
         Task<Integer> t2 = retryPolicy.runAsync(createFlakyTaskFactory(6, exceptionFactory));
         t2.waitForCompletion();
-        assertEquals(Task.State.CompletedSuccessfully, t2.getState());
+        assertEquals(Task.State.Succeeded, t2.getState());
         exceptionCounter.value = 0;
 
         Task<Integer> t3 = retryPolicy.runAsync(createFlakyTaskFactory(7, exceptionFactory));
         t3.waitForCompletion();
-        assertEquals(Task.State.CompletedInError, t3.getState());
+        assertEquals(Task.State.Failed, t3.getState());
         exceptionCounter.value = 0;
 
     }

@@ -10,8 +10,6 @@ import static tasks.ArgumentValidation.notNull;
  * a collection of helper methods useful when working with Tasks and other threading constructs
  */
 public class TaskUtils {
-    private static Executor sExecutorFromUiThread;
-
     public static <T> Runnable toRunnable(final Action<T> action, final T value){
         return new Runnable() {
             @Override

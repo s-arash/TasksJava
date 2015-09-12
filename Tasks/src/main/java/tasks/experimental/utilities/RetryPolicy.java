@@ -1,4 +1,4 @@
-package tasks.utilities;
+package tasks.experimental.utilities;
 
 import tasks.Function;
 import tasks.Ref;
@@ -42,7 +42,7 @@ public abstract class RetryPolicy {
                 return TaskUtils.fromFactory(taskFactory).continueWith(new Function<Task<T>, Task<Void>>() {
                     @Override
                     public Task<Void> call(Task<T> tTask) throws Exception {
-                        if (tTask.getState() == Task.State.CompletedSuccessfully) {
+                        if (tTask.getState() == Task.State.Succeeded) {
                             resultingTask.value = tTask;
                         } else {
                             HandleResult handleResult = currentPolicy.value.handle(tTask.getException());

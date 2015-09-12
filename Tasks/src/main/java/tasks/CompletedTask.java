@@ -20,7 +20,7 @@ class CompletedTask<T> extends Task<T> {
 
     @Override
     public State getState() {
-        return State.CompletedSuccessfully;
+        return State.Succeeded;
     }
 
     @Override
@@ -46,7 +46,7 @@ class CompletedTask<T> extends Task<T> {
 }
 
 /**
- * represents a task with CompletedInError state
+ * represents a task with Failed state
  */
 class FaultedTask<T> extends Task<T>{
 
@@ -60,7 +60,7 @@ class FaultedTask<T> extends Task<T>{
 
     @Override
     public State getState() {
-        return State.CompletedInError;
+        return State.Failed;
     }
 
     @Override

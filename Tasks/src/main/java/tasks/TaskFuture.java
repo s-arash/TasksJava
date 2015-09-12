@@ -2,16 +2,35 @@ package tasks;
 
 import tasks.internal.Utils;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 import static tasks.ArgumentValidation.notNull;
+
 /**
- * Created by sahebolamri on 7/5/2015.
+ * static methods to convert Tasks to Java's Futures and vice versa
  */
 class TaskFuture {
+
+    private static Object futureCompletionThreadPoolSyncLock = new Object();
+    private static Executor futureCompletionThreadPool;
+    private static Executor getFutureCompletionThreadPool(){
+        //this is Executors.newCachedThreadPool()'s body:
+        //return new ThreadPoolExecutor(0, Integer.MAX_VALUE,
+        //        60L, TimeUnit.SECONDS,
+        //        new SynchronousQueue<Runnable>());
+
+        if(futureCompletionThreadPool == null){
+            synchronized (futureCompletionThreadPoolSyncLock) {
+                if(futureCompletionThreadPool == null) {
+                    futureCompletionThreadPool =
+                            new ThreadPoolExecutor(0, 1024,
+                                    5L, TimeUnit.SECONDS,
+                                    new SynchronousQueue<Runnable>());
+                }
+            }
+        }
+        return futureCompletionThreadPool;
+    }
     public static <T> Task<T> toTask(final Future<? extends T> future) {
         if (notNull(future, "future cannot be null").isDone()) {
             try {
@@ -22,20 +41,20 @@ class TaskFuture {
                 return Task.fromException(e.getCause() != null ? Utils.getRuntimeException(e.getCause()) : e);
             }
         } else {
-            final TaskManualCompletion<T> tmc = new TaskManualCompletion<>();
-            new Thread(new Runnable() {
+            final TaskBuilder<T> taskBuilder = new TaskBuilder<>();
+            getFutureCompletionThreadPool().execute(new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        tmc.setResult(future.get());
+                        taskBuilder.setResult(future.get());
                     } catch (InterruptedException e) {
-                        tmc.setException(e);
+                        taskBuilder.setException(e);
                     } catch (ExecutionException e) {
-                        tmc.setException(e.getCause() != null ? Utils.getRuntimeException(e.getCause()) : e);
+                        taskBuilder.setException(e.getCause() != null ? Utils.getRuntimeException(e.getCause()) : e);
                     }
                 }
-            }).start();
-            return tmc.getTask();
+            });
+            return taskBuilder.getTask();
         }
     }
 

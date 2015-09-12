@@ -30,17 +30,17 @@ public class TaskConversionTests  {
         failingFutureTask.run();
         Task<Integer> taskFromFailingFuture = Task.fromFuture(failingFutureTask);
         taskFromFailingFuture.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedInError, taskFromFailingFuture.getState());
+        Assert.assertEquals(Task.State.Failed, taskFromFailingFuture.getState());
         Assert.assertTrue( taskFromFailingFuture.getException() instanceof UnsupportedOperationException);
 
         Task<Integer> task2FromFailingFuture = Task.fromFuture(failingFutureTask);
-        Assert.assertEquals(Task.State.CompletedInError, task2FromFailingFuture.getState());
+        Assert.assertEquals(Task.State.Failed, task2FromFailingFuture.getState());
         Assert.assertTrue(task2FromFailingFuture.getException() instanceof UnsupportedOperationException);
 
         succeedingFutureTask.run();
         Task<Integer> taskFromSucceedingFuture = Task.fromFuture(succeedingFutureTask);
         taskFromSucceedingFuture.waitForCompletion();
-        Assert.assertEquals(Task.State.CompletedSuccessfully, taskFromSucceedingFuture.getState());
+        Assert.assertEquals(Task.State.Succeeded, taskFromSucceedingFuture.getState());
         Assert.assertEquals((Integer) 42, taskFromSucceedingFuture.result());
 
     }

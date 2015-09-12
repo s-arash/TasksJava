@@ -18,7 +18,7 @@ public class TaskRx {
     public static <T> Task<T> fromObservable(Observable<T> observable){
         ArgumentValidation.notNull(observable, "observable cannot be null");
 
-        final TaskManualCompletion<T> tmc = new TaskManualCompletion<>();
+        final TaskBuilder<T> taskBuilder = new TaskBuilder<>();
         final Ref<Boolean> done = new Ref<>(false);
 
         final Ref<Subscription> subscription = new Ref<>();
@@ -26,7 +26,7 @@ public class TaskRx {
             @Override
             public void onCompleted() {
                 if(!done.value){
-                    tmc.setException(new Exception("Empty observable source"));
+                    taskBuilder.setException(new Exception("Empty observable source"));
                     done.value = true;
                 }
             }
@@ -35,7 +35,7 @@ public class TaskRx {
             public void onError(Throwable throwable) {
                 if (!done.value) {
                     Exception ex= throwable instanceof Exception ? (Exception) throwable : new Exception(throwable.getMessage(),throwable);
-                    tmc.setException(ex);
+                    taskBuilder.setException(ex);
                     done.value = true;
                 }
                 if(subscription.value != null && !subscription.value.isUnsubscribed())
@@ -45,14 +45,14 @@ public class TaskRx {
             @Override
             public void onNext(T t) {
                 if (!done.value) {
-                    tmc.setResult(t);
+                    taskBuilder.setResult(t);
                     done.value = true;
                 }
                 if(subscription.value != null && !subscription.value.isUnsubscribed())
                     subscription.value.unsubscribe();
             }
         });
-        return tmc.getTask();
+        return taskBuilder.getTask();
     }
 
     /**
@@ -68,7 +68,7 @@ public class TaskRx {
                     task.registerCompletionCallback(new Action<Task<T>>() {
                         @Override
                         public void call(Task<T> arg) throws Exception {
-                            if (arg.getState() == Task.State.CompletedInError) {
+                            if (arg.getState() == Task.State.Failed) {
                                 subscriber.onError(arg.getException());
                             } else {
                                 subscriber.onNext(arg.result());

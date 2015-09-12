@@ -56,7 +56,7 @@ public class TaskRxTests {
 
         Task<Object> taskFromFailingObservable = TaskRx.fromObservable(failingObservable);
         taskFromFailingObservable.waitForCompletion();
-        assertTrue(taskFromFailingObservable.getState() == Task.State.CompletedInError);
+        assertTrue(taskFromFailingObservable.getState() == Task.State.Failed);
         assertTrue(taskFromFailingObservable.getException().getMessage().equals("HI!"));
     }
 

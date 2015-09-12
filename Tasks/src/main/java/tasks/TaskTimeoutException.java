@@ -1,8 +1,8 @@
 package tasks;
 
-/**
- * Created by sahebolamri on 9/5/2015.
- */
+import tasks.annotations.Experimental;
+
+@Experimental
 public class TaskTimeoutException extends Exception {
     private final Task<?> timedOutTask;
 

@@ -1,7 +1,7 @@
 package tasks;
 
 /**
- * Created by sahebolamri on 7/11/2015.
+ * It is a tuple type of two values
  */
 public class Pair<T1,T2> {
     public final T1 item1;

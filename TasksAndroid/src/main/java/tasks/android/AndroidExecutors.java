@@ -10,12 +10,10 @@ import static tasks.ArgumentValidation.notNull;
  * Created by Arash on 8/11/2015.
  */
 public class AndroidExecutors {
-    private static Executor sExecutorFromUiThread;
-
     /**
-     * wraps the Handler in an Executor object, useful when using Tasks in android ui
+     * wraps the Handler in an Executor object
      */
-    public static Executor toExecutor(final Handler handler){
+    public static Executor from(final Handler handler){
         notNull(handler, "handler cannot be null");
         return new Executor() {
             @Override
@@ -26,9 +24,9 @@ public class AndroidExecutors {
     }
 
     /**
-     * returns an Executor that schedules commands on the activity's UI thread
+     * returns an Executor that schedules actions on the activity's UI thread
      */
-    public static Executor toExecutor(final Activity activity){
+    public static Executor from(final Activity activity){
         notNull(activity, "activity cannot be null");
         return new Executor() {
             @Override
@@ -38,12 +36,13 @@ public class AndroidExecutors {
         };
     }
 
+    private static Executor executorFromMainThread;
     /**
-     * returns an Executor that schedules commands on the app's main thread
+     * returns an Executor that schedules actions on the app's main thread
      */
-    public static Executor executorFromMainThread(){
+    public static Executor fromMainThread(){
         //just to make things contrived
-        return sExecutorFromUiThread != null? sExecutorFromUiThread : (sExecutorFromUiThread = toExecutor(new Handler(Looper.getMainLooper())));
+        return executorFromMainThread != null? executorFromMainThread : (executorFromMainThread = from(new Handler(Looper.getMainLooper())));
     }
 
 }

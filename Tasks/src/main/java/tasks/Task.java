@@ -1,5 +1,7 @@
 package tasks;
 
+import tasks.annotations.Experimental;
+
 import java.io.Closeable;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -20,21 +22,21 @@ import static tasks.ArgumentValidation.notNull;
  */
 public abstract class Task<T> {
     public enum State {
-        NotCompleted,
-        CompletedSuccessfully,
-        CompletedInError,
+        NotDone,
+        Succeeded,
+        Failed,
     }
 
     public abstract State getState();
 
     /**
-     * registers the given continuation to run when the current Task object completes, either successfully or in error.
+     * registers the given continuation to run when the current Task object is done, either successfully or in failure.
      *
      * @return a Task that is given by the continuation
      */
     public final <U> Task<U> continueWith(final Function<Task<T>, Task<U>> continuation) {
         notNull(continuation, "continuation cannot be null");
-        final TaskManualCompletion<U> continuationManualCompletion = new TaskManualCompletion<>(getContinuationExecutor());
+        final TaskBuilder<U> continuationManualCompletion = new TaskBuilder<>(getContinuationExecutor());
         this.registerCompletionCallback(new Action<Task<T>>() {
             @Override
             public void call(final Task<T> arg) throws Exception {
@@ -50,7 +52,7 @@ public abstract class Task<T> {
     }
 
     /**
-     * registers the given continuation to run when the current Task object completes, either successfully or in error.
+     * registers the given continuation to run when the current Task is done, either successfully or in failure.
      *
      * @return a Task that wraps the value returned by the continuation
      */
@@ -65,7 +67,7 @@ public abstract class Task<T> {
     }
 
     /**
-     * registers the given continuation to run when the current Task object completes, either successfully or in error.
+     * registers the given continuation to run when the current Task object completes, either successfully or in failure.
      */
     public final Task<Void> continueWithSync(final Action<Task<T>> continuation) {
         notNull(continuation, "continuation cannot be null");
@@ -79,24 +81,24 @@ public abstract class Task<T> {
     }
 
     /**
-     * continues this task with the given continuation, if this Task completes successfully.
+     * continues this task with the given continuation, if this Task succeeds.
      *
      * @param continuation
      * @return a Task that:
-     * - if this Task completes successfully, is given by continuation
+     * - if this Task succeeds, is given by continuation
      * - if this Task fails, so does the returned Task
      */
     public final <U> Task<U> then(final Function<? super T, Task<U>> continuation) {
         notNull(continuation, "continuation cannot be null");
-        final TaskManualCompletion<U> continuationManualCompletion = new TaskManualCompletion<>(getContinuationExecutor());
+        final TaskBuilder<U> continuationManualCompletion = new TaskBuilder<>(getContinuationExecutor());
 
         this.registerCompletionCallback(new Action<Task<T>>() {
             @Override
             public void call(final Task<T> arg) throws Exception {
                 State state = arg.getState();
-                if (state == State.CompletedInError) {
+                if (state == State.Failed) {
                     continuationManualCompletion.setException(arg.getException());
-                } else if (state == State.CompletedSuccessfully) {
+                } else if (state == State.Succeeded) {
                     continuationManualCompletion.bindToATaskFactory(new Callable<Task<U>>() {
                         @Override
                         public Task<U> call() throws Exception {
@@ -151,43 +153,43 @@ public abstract class Task<T> {
 
     /**
      * returns a Task that catches an exception of type exceptionType from this task.
-     * the returned Task completes successfully if this Task does, otherwise (if this Task completes in error),
+     * the returned Task completes successfully if this Task does, otherwise (if this Task fails),
      * is the result of the given catchBody
      */
     public final <TException extends Exception> Task<T> tryCatch(final Class<TException> exceptionType, final Function<? super TException, Task<T>> catchBody) {
         notNull(exceptionType, "exceptionType cannot be null");
         notNull(catchBody, "catchBody cannot be null");
 
-        final TaskManualCompletion<T> tmc = new TaskManualCompletion<T>(getContinuationExecutor());
+        final TaskBuilder<T> taskBuilder = new TaskBuilder<T>(getContinuationExecutor());
 
         this.registerCompletionCallback(new Action<Task<T>>() {
             @Override
             public void call(final Task<T> arg) throws Exception {
                 State state = arg.getState();
-                if (state == State.CompletedSuccessfully) {
-                    tmc.setResult(arg.result());
-                } else if (state == State.CompletedInError) {
+                if (state == State.Succeeded) {
+                    taskBuilder.setResult(arg.result());
+                } else if (state == State.Failed) {
                     final Exception taskException = arg.getException();
                     if (exceptionType.isInstance(taskException)) {
                         final TException exceptionAsTException = (TException) taskException;
-                        tmc.bindToATaskFactory(new Callable<Task<T>>() {
+                        taskBuilder.bindToATaskFactory(new Callable<Task<T>>() {
                             @Override
                             public Task<T> call() throws Exception {
                                 return catchBody.call(exceptionAsTException);
                             }
                         });
                     } else {
-                        tmc.setException(taskException);
+                        taskBuilder.setException(taskException);
                     }
                 } else throw new Exception("ERROR in tryCatch(). invalid task state");
             }
         });
 
-        return tmc.getTask();
+        return taskBuilder.getTask();
     }
 
     /**
-     * returns a Task that completes successfully if this Task does, otherwise (if this Task completes in error),
+     * returns a Task that completes successfully if this Task does, otherwise (if this Task fails),
      * is the result of the given catchBody
      */
     public final Task<T> tryCatch(final Function<? super Exception, Task<T>> catchBody) {
@@ -221,16 +223,18 @@ public abstract class Task<T> {
     }
 
     /**
-     * The finally block runs when the task completes, either successfully or in error.
-     * The task returned by this method still has the state and value of the original task.
+     * The finally block runs when the task is done.
+     * The task returned by this method has the completion state and value of the original task.
+     * @return a Task that runs finallyBlock after this Task is done, and retains the completion state of this Task
+     * (unless finallyBlock fails, in which case it will fail with the same Exception)
      */
     public final Task<T> tryFinally(final Function<Void, Task<Void>> finallyBlock) {
         notNull(finallyBlock, "finallyBlock cannot be null");
-        final TaskManualCompletion<T> tmc = new TaskManualCompletion<T>(getContinuationExecutor());
+        final TaskBuilder<T> taskBuilder = new TaskBuilder<T>(getContinuationExecutor());
         this.registerCompletionCallback(new Action<Task<T>>() {
             @Override
             public void call(Task<T> arg) throws Exception {
-                tmc.bindToATaskFactory(new Callable<Task<T>>() {
+                taskBuilder.bindToATaskFactory(new Callable<Task<T>>() {
                     @Override
                     public Task<T> call() throws Exception {
                         return finallyBlock.call(null).then(new Function<Void, Task<T>>() {
@@ -244,7 +248,7 @@ public abstract class Task<T> {
             }
         });
 
-        return tmc.getTask();
+        return taskBuilder.getTask();
     }
 
     /**
@@ -262,12 +266,13 @@ public abstract class Task<T> {
     }
 
     /**
-     * returns a Task that closes the given resource after body is done whether successfully or in error. The result of the returned Task will be
+     * returns a Task that closes the given resource after body is done (whether it succeeds or fails). The result of the returned Task will be
      * the same as the result of body.
      *
      * @param resource the given resource that will be closed when body is done
      * @param body     performs an async operation with resource
      */
+    @Experimental
     public static <T, U extends Closeable> Task<T> tryWithResource(final U resource, final Function<? super U, Task<T>> body) {
         return TaskUtils.fromFactory(new Callable<Task<T>>() {
             @Override
@@ -294,13 +299,13 @@ public abstract class Task<T> {
     /**
      * returns a Task that bundles the results of the two tasks together in a {@link Pair}
      *
-     * @return a Task that holds the results of the two tasks in a pair, or an exception if any of the given tasks fails
+     * @return a Task that holds the results of the two Tasks in a pair, or an Exception if any of the given tasks fails
      */
     public final <U> Task<Pair<T, U>> zip(final Task<U> other) {
         return Task.whenAny(this, notNull(other, "other cannot be null")).then(new Function<Task<?>, Task<Pair<T, U>>>() {
             @Override
             public Task<Pair<T, U>> call(Task<?> task) throws Exception {
-                if (task.getState() == State.CompletedInError) {
+                if (task.getState() == State.Failed) {
                     return Task.fromException(task.getException());
                 } else {
                     Task<?> unfinished = task == Task.this ? other : Task.this;
@@ -319,18 +324,20 @@ public abstract class Task<T> {
     /**
      * returns a Task that schedules its continuations on the given {@link Executor}.
      * the given executor propagates to all the Tasks created from this Task (using then(), tryCatch(), and their siblings)
+     * @return a Task that schedules its continuations on the given {@link Executor}.
      */
     public final Task<T> continueOn(Executor continuationExecutor) {
-        TaskManualCompletion<T> tmc = new TaskManualCompletion<>(continuationExecutor);
-        tmc.bindToATask(this);
-        return tmc.getTask();
+        TaskBuilder<T> taskBuilder = new TaskBuilder<>(continuationExecutor);
+        taskBuilder.bindToATask(this);
+        return taskBuilder.getTask();
     }
 
     /**
-     * returns a Task that, if this Task does not complete in the amount of time given by {timeout} and {timeUnit}, fails with a {@link TaskTimeoutException}
+     * returns a Task that, if this Task does not complete in the amount of time given by {@code timeout} and {@code timeUnit}, fails with a {@link TaskTimeoutException}
      * @param timeout the amount of time to wait before waiting with a {@link TaskTimeoutException}
      * @param timeUnit the unit of {timeout}
      */
+    @Experimental
     public final Task<T> withTimeout(final long timeout, final TimeUnit timeUnit) {
         return Task.whenAny(this, Task.delay(timeout, timeUnit)).then(new Function<Task<?>, Task<T>>() {
             @Override
@@ -344,9 +351,10 @@ public abstract class Task<T> {
     }
 
     /**
-     * returns a Task that, if this Task does not complete in the amount of time given by {timeoutMillis}, fails with a {@link TaskTimeoutException}
+     * returns a Task that, if this Task does not complete in the amount of time given by {@code timeoutMillis}, fails with a {@link TaskTimeoutException}
      * @param timeoutMillis the amount of time to wait before waiting with a {@link TaskTimeoutException}
      */
+    @Experimental
     public final Task<T> withTimeout(final long timeoutMillis) {
         return withTimeout(timeoutMillis, TimeUnit.MILLISECONDS);
     }
@@ -356,15 +364,15 @@ public abstract class Task<T> {
     }
 
     /**
-     * returns the value computed by the task, or in the case of a Task completed in error, throws the exception.
-     * If the task isn't completed yet, blocks the current thread until it completes.
+     * returns the value computed by this Task, or in the case of a Task that has failed, throws the exception.
+     * If the Task isn't done yet, blocks the current thread until it completes.
      * NOTE: Use this method with caution, if the Task's completion depends on running code on the current thread's
      * message queue, calling this method results in a deadlock
      */
     public abstract T result() throws Exception;
 
     /**
-     * blocks the current thread until the task completes
+     * blocks the current thread until this Task is done
      */
     public final void waitForCompletion() {
         try {
@@ -374,16 +382,17 @@ public abstract class Task<T> {
     }
 
     /**
-     * @return if the task resulted in an exception, returns the exception, otherwise returns null
+     * @return if the Task resulted in an {@link Exception}, returns the {@code Exception},
+     * otherwise (if it succeeded or it's not done yet) returns null
      */
     public abstract Exception getException();
 
     /**
-     * @return if the task has completed (successfully or with and exception) returns true, otherwise returns false
+     * @return if the task has completed (either succeeded or failed) returns true, otherwise returns false
      */
     public final boolean isDone() {
         State state = this.getState();
-        return state == State.CompletedSuccessfully || state == State.CompletedInError;
+        return state == State.Succeeded || state == State.Failed;
     }
 
     /**
@@ -392,21 +401,19 @@ public abstract class Task<T> {
     public abstract void registerCompletionCallback(Action<Task<T>> callback);
 
     /**
-     * wraps the Task as a Future object
+     * converts the Task to a Future object
      */
-    public final Future<T> asFuture() {
+    public final Future<T> toFuture() {
         return new TaskFuture.FutureFromTask<T>(this);
     }
-
 
     //--------------Factory methods----------------
 
     /**
      * Creates a Task object from a {@link Future}.
      * Note that in order to get completion notification, this method spawns a new thread, which is suboptimal to say the least. You can blame Java's Future design for that.
-     * That's one reason why you should steer clear from using Java's Futures as much as possible if you wanna right async code.
      *
-     * @return the Task created form the Future
+     * @return the Task created form {@code future}
      */
     public static <T> Task<T> fromFuture(Future<? extends T> future) {
         notNull(future, "future cannot be null");
@@ -427,14 +434,14 @@ public abstract class Task<T> {
      * returns a task that completes after the given timeout. This is the {@link Thread#sleep(long)} of the async world!
      */
     public static Task<Void> delay(long timeoutMilliseconds) {
-        final TaskManualCompletion<Void> tmc = new TaskManualCompletion<>();
+        final TaskBuilder<Void> taskBuilder = new TaskBuilder<>();
         delayTimer.schedule(new TimerTask() {
             @Override
             public void run() {
-                tmc.setResult(null);
+                taskBuilder.setResult(null);
             }
         }, timeoutMilliseconds);
-        return tmc.getTask();
+        return taskBuilder.getTask();
     }
 
     /**
@@ -458,14 +465,14 @@ public abstract class Task<T> {
     }
 
     /**
-     * creates a Task already in CompletedInError state with the given {@code exception}
+     * creates a Task already in Failed state with the given {@code exception}
      */
     public static <T> Task<T> fromException(Exception exception) {
         return new FaultedTask<T>(exception, TaskSharedStuff.defaultExecutor);
     }
 
     /**
-     * creates a Task already in CompletedInError state with the given {@code exception}, which schedules its continuations on the given {@link Executor}
+     * creates a Task already in Failed state with the given {@code exception}, which schedules its continuations on the given {@link Executor}
      */
     public static <T> Task<T> fromException(Exception exception, Executor continuationExecutor) {
         return new FaultedTask<T>(exception, continuationExecutor);
@@ -474,6 +481,7 @@ public abstract class Task<T> {
     /**
      * unwraps the wrapped task
      */
+    @Experimental
     public static <T> Task<T> unwrap(Task<Task<T>> wrappedTask) {
         return wrappedTask.then(new Function<Task<T>, Task<T>>() {
             @Override
@@ -485,8 +493,9 @@ public abstract class Task<T> {
 
 
     /**
-     * returns a Task that completes when any of the give tasks complete (either successfully or with error)
+     * returns a Task that completes when any of the give tasks complete (either successfully or in failure)
      * the returned task will contain the first finished task as its result
+     * @return a Task that completes when any of the given Tasks is done, with that Task as its result
      */
     public static Task<Task<?>> whenAny(Task<?>... tasks) {
         notNull(tasks, "tasks cannot be null");
@@ -494,12 +503,12 @@ public abstract class Task<T> {
         elementsNotNull(tasks, "elements of tasks cannot be empty");
 
         final AtomicBoolean done = new AtomicBoolean();
-        final TaskManualCompletion<Task<?>> tmc = new TaskManualCompletion<>();
+        final TaskBuilder<Task<?>> taskBuilder = new TaskBuilder<>();
         Action<Task<Object>> callback = new Action<Task<Object>>() {
             @Override
             public void call(Task<Object> arg) throws Exception {
                 if (done.compareAndSet(false, true)) { // if you DID set the value
-                    tmc.setResult(arg);
+                    taskBuilder.setResult(arg);
                 }
             }
         };
@@ -507,13 +516,14 @@ public abstract class Task<T> {
             Task<Object> t = (Task<Object>) task;
             t.registerCompletionCallback(callback);
         }
-        return tmc.getTask();
+        return taskBuilder.getTask();
     }
 
     /**
      * returns a Task that completes when any of the given tasks complete successfully.
-     * the returned task will contain the first successfully completed task as its result. If none of
-     * the tasks complete successfully, the returned task will complete in error with the exception of the last task of tasks that completed in error.
+     * the returned task will contain the first successfully completed task as its result. If none of the tasks complete successfully,
+     * the returned task will fail with the exception of the last task of tasks failed.
+     * @return a Task that completes when any of the given Tasks succeeds, with that Task as its result
      */
     public static Task<Task<?>> whenAnySucceeds(final Task<?>... tasks) {
         notNull(tasks, "tasks cannot be null");
@@ -522,18 +532,18 @@ public abstract class Task<T> {
 
         final AtomicBoolean done = new AtomicBoolean();
         final AtomicInteger faultedTasksCount = new AtomicInteger();
-        final TaskManualCompletion<Task<?>> tmc = new TaskManualCompletion<>();
+        final TaskBuilder<Task<?>> taskBuilder = new TaskBuilder<>();
         Action<Task<Object>> callback = new Action<Task<Object>>() {
             @Override
             public void call(Task<Object> task) throws Exception {
                 if (!done.get()) {
-                    if (task.getState() == State.CompletedSuccessfully) {
+                    if (task.getState() == State.Succeeded) {
                         if (done.compareAndSet(false, true)) { // if you DID set the value
-                            tmc.setResult(task);
+                            taskBuilder.setResult(task);
                         }
                     } else {
                         if (faultedTasksCount.incrementAndGet() == tasks.length) {
-                            tmc.setException(task.getException());
+                            taskBuilder.setException(task.getException());
                         }
                     }
                 }
@@ -543,23 +553,23 @@ public abstract class Task<T> {
             Task<Object> t = (Task<Object>) task;
             t.registerCompletionCallback(callback);
         }
-        return tmc.getTask();
+        return taskBuilder.getTask();
     }
 
     /**
-     * returns a task that completes when all of the given tasks complete (either successfully or with error)
+     * returns a task that completes when all of the given tasks are done (either in success or failure)
      */
     public static Task<Task<?>[]> whenAll(final Task<?>... tasks) {
         notNull(tasks, "tasks cannot be null");
         if (tasks.length == 0) return Task.fromResult(tasks);
 
         final AtomicInteger doneCount = new AtomicInteger();
-        final TaskManualCompletion<Task<?>[]> tmc = new TaskManualCompletion<>();
+        final TaskBuilder<Task<?>[]> taskBuilder = new TaskBuilder<>();
         Action<Task<Object>> callback = new Action<Task<Object>>() {
             @Override
             public void call(Task<Object> arg) throws Exception {
                 if (doneCount.incrementAndGet() == tasks.length) {
-                    tmc.setResult(tasks);
+                    taskBuilder.setResult(tasks);
                 }
             }
         };
@@ -567,46 +577,47 @@ public abstract class Task<T> {
             Task<Object> t = (Task<Object>) task;
             t.registerCompletionCallback(callback);
         }
-        return tmc.getTask();
+        return taskBuilder.getTask();
     }
 
     /**
-     * creates a Task object that runs the given function on the given {@link Executor}
+     * creates a Task object that runs the given {@code code} on the given {@link Executor}
      */
-    public static <T> Task<T> run(final Callable<? extends T> function, Executor executor) {
-        notNull(function, "function cannot be null");
-        final TaskManualCompletion tmc = new TaskManualCompletion(executor);
+    public static <T> Task<T> run(final Callable<? extends T> code, Executor executor) {
+        notNull(code, "code cannot be null");
+        final TaskBuilder taskBuilder = new TaskBuilder(executor);
         notNull(executor, "executor cannot be null").
             execute(new Runnable() {
                         @Override
                         public void run() {
                             try {
-                                tmc.setResult(function.call());
+                                taskBuilder.setResult(code.call());
                             } catch (Exception ex) {
-                                tmc.setException(ex);
+                                taskBuilder.setException(ex);
                             }
                         }
                     }
             );
-        return tmc.getTask();
+        return taskBuilder.getTask();
     }
 
     /**
-     * creates a Task object that runs the given {@code function} asynchronously
+     * creates a Task object that runs the given {@code code} asynchronously
      */
-    public static <T> Task<T> run(final Callable<? extends T> function) {
-        return Task.run(function, TaskSharedStuff.defaultExecutor);
+    public static <T> Task<T> run(final Callable<? extends T> code) {
+        return Task.run(code, TaskSharedStuff.defaultExecutor);
     }
 
     /**
-     * returns a Task that is the result of applying the body function to elements in seq in succession,
+     * the async equivalent of the for-each loop in Java
+     * @return a Task that is the result of applying the body function to elements in {@code seq} in succession,
      * each task is created after the last one is completed
      */
     public static <T> Task<Void> forEach(Iterable<? extends T> seq, final Function<? super T, Task<Void>> body) {
         notNull(seq, "seq cannot be null");
         notNull(body, "body cannot be null");
 
-        final TaskManualCompletion<Void> tmc = new TaskManualCompletion<>();
+        final TaskBuilder<Void> taskBuilder = new TaskBuilder<>();
         final Iterator<? extends T> iterator = seq.iterator();
         Runnable runnable = new Runnable() {
             @Override
@@ -619,26 +630,26 @@ public abstract class Task<T> {
                             @Override
                             public void call(Task<Void> arg) throws Exception {
                                 if (arg.getException() != null)
-                                    tmc.setException(arg.getException());
+                                    taskBuilder.setException(arg.getException());
                                 else
                                     run();
                             }
                         });
                     } else {
-                        tmc.setResult(null);
+                        taskBuilder.setResult(null);
                     }
                 } catch (Exception ex) {
-                    tmc.setException(ex);
+                    taskBuilder.setException(ex);
                 }
             }
         };
         runnable.run();
-        return tmc.getTask();
+        return taskBuilder.getTask();
     }
 
     /**
-     * returns a {@code Task<List<TOut>>} that contains the results of the tasks of the body function, applied to elements of seq,
-     * each task is created after the last one is completed
+     * returns a {@code Task<List<TOut>>} that contains the results of the Tasks of the body function, applied to elements of seq,
+     * each Task is created after the last one is completed
      */
     public static <TIn, TOut> Task<List<TOut>> forEachGenerate(Iterable<? extends TIn> seq, final Function<? super TIn, Task<TOut>> body) {
         notNull(body, "body cannot be null");
@@ -664,7 +675,7 @@ public abstract class Task<T> {
     }
 
     /**
-     * the async equivalent of a while(condition){body} loop
+     * the async equivalent of a {@code while(condition){body}} loop
      *
      * @return a Task that is the result of running body as long as condition is true
      */
@@ -672,7 +683,7 @@ public abstract class Task<T> {
         notNull(condition, "condition cannot be null");
         notNull(body, "body cannot be null");
 
-        final TaskManualCompletion<Void> tmc = new TaskManualCompletion<>();
+        final TaskBuilder<Void> taskBuilder = new TaskBuilder<>();
         final Runnable runnable = new Runnable() {
             @Override
             public void run() {
@@ -683,25 +694,25 @@ public abstract class Task<T> {
                             @Override
                             public void call(Task<Void> arg) throws Exception {
                                 if (arg.getException() != null)
-                                    tmc.setException(arg.getException());
+                                    taskBuilder.setException(arg.getException());
                                 else
                                     run();
                             }
                         });
                     } else {
-                        tmc.setResult(null);
+                        taskBuilder.setResult(null);
                     }
                 } catch (Exception ex) {
-                    tmc.setException(ex);
+                    taskBuilder.setException(ex);
                 }
             }
         };
         runnable.run();
-        return tmc.getTask();
+        return taskBuilder.getTask();
     }
 
     /**
-     * the async equivalent of a do{ body }while(condition); loop
+     * the async equivalent of a {@code do{ body }while(condition);} loop
      */
     public static Task<Void> doWhile(final Callable<Task<Void>> body, final Callable<Boolean> condition) {
         final Ref<Boolean> isFirstRun = new Ref<>(true);

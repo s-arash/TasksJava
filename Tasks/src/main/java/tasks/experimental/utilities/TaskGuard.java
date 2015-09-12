@@ -1,4 +1,4 @@
-package tasks.utilities;
+package tasks.experimental.utilities;
 
 
 import tasks.Task;
@@ -40,9 +40,9 @@ public class TaskGuard<T> {
      * @return the guarded Task
      */
     public synchronized Task<T> get(){
-        if(this.mTask == null || this.mTask.getState() == Task.State.CompletedInError){
+        if(this.mTask == null || this.mTask.getState() == Task.State.Failed){
             this.mTask = TaskUtils.fromFactory(mTaskFactory);
-        }else if(mTask.getState() == Task.State.CompletedSuccessfully && ! mCacheResult){
+        }else if(mTask.getState() == Task.State.Succeeded && ! mCacheResult){
             this.mTask = TaskUtils.fromFactory(mTaskFactory);
         }
         return mTask;

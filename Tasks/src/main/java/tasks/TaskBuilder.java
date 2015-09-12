@@ -7,9 +7,9 @@ import java.util.concurrent.Executor;
 
 import static tasks.ArgumentValidation.notNull;
 /**
- * Use this class to create Task objects whose completion values or errors can be manually set
+ * This class can be used to create {@link Task} objects whose completion results or exceptions can be manually set
  */
-public class TaskManualCompletion<T> {
+public class TaskBuilder<T> {
     private T mResult;
     private Exception mException;
     private Task<T> mTheTask;
@@ -20,19 +20,19 @@ public class TaskManualCompletion<T> {
     private CountDownLatch resultSignal = new CountDownLatch(1);
     private final Object syncLock = new Object();
 
-    public TaskManualCompletion() {
+    public TaskBuilder() {
         this(TaskSharedStuff.defaultExecutor);
     }
 
-    public TaskManualCompletion(final Executor continuationExecutor) {
+    public TaskBuilder(final Executor continuationExecutor) {
         this.continuationExecutor = notNull(continuationExecutor);
 
         mTheTask = new Task<T>() {
             @Override
             public State getState() {
-                if (!isDone) return State.NotCompleted;
-                else if (mException != null) return State.CompletedInError;
-                else return State.CompletedSuccessfully;
+                if (!isDone) return State.NotDone;
+                else if (mException != null) return State.Failed;
+                else return State.Succeeded;
             }
 
             @Override
@@ -75,6 +75,10 @@ public class TaskManualCompletion<T> {
         };
     }
 
+    /**
+     *
+     * @return the {@link Task} object whose completion status is controlled by this {@link TaskBuilder} instance
+     */
     public Task<T> getTask() {
         return mTheTask;
     }
@@ -94,10 +98,17 @@ public class TaskManualCompletion<T> {
         });
     }
 
+    /**
+     * marks the Task given by this {@link TaskBuilder} instance as succeeded with the given result
+     */
     public void setResult(T result) {
         setExceptionOrResult(null, result);
     }
 
+    /**
+     * marks the Task given by this {@link TaskBuilder} instance as failed with the given Exception
+     * @param exception
+     */
     public void setException(Exception exception) {
         setExceptionOrResult(notNull(exception,"exception cannot be null"), null);
     }
@@ -119,14 +130,17 @@ public class TaskManualCompletion<T> {
             callContinuation(continuations.remove());
     }
 
+    /**
+     * Binds the completion result or Exception of the Task returned by this instance to the completion result of the given task
+     */
     public void bindToATask(Task<T> task) {
         notNull(task,"task cannot be null").registerCompletionCallback(new Action<Task<T>>() {
             @Override
             public void call(Task<T> arg) throws Exception {
                 Task.State state = arg.getState();
-                if (state == Task.State.CompletedInError)
+                if (state == Task.State.Failed)
                     setException(arg.getException());
-                else if (state == Task.State.CompletedSuccessfully)
+                else if (state == Task.State.Succeeded)
                     setResult(arg.result());
                 else
                     throw new IllegalStateException("the task is in an illegal state");
@@ -134,6 +148,9 @@ public class TaskManualCompletion<T> {
         });
     }
 
+    /**
+     * Binds the completion result or Exception of the Task returned by this instance to the completion result of the task provided by the given taskFactory
+     */
     public void bindToATaskFactory(Callable<Task<T>> taskFactory) {
         notNull(taskFactory, "taskFactory cannot be null");
         try {

@@ -1,5 +1,5 @@
 group 'net.s-arash'
-version '0.1-SNAPSHOT'
+version '0.2.0-SNAPSHOT'
 
 buildscript {
     repositories {
@@ -12,7 +12,6 @@ buildscript {
         classpath "org.jfrog.buildinfo:build-info-extractor-gradle:3.1.1"
     }
 }
-//apply plugin: 'java'
 apply plugin: 'com.android.library'
 
 android {
@@ -20,7 +19,7 @@ android {
     buildToolsVersion '22.0.1'
 
     defaultConfig {
-        minSdkVersion 13
+        minSdkVersion 11
     }
 
     compileOptions {
@@ -60,9 +59,9 @@ signing {
 
 
 apply from:"artifacts.gradle"
-group = "net.s-arash"
+//group = "net.s-arash"
 archivesBaseName = "tasksandroid"
-version = "0.1.0-beta01"
+//version = "0.2.0-beta01"
 
 tasks['uploadArchives'].onlyIf { project.hasProperty('signing.keyId')}
 tasks['signArchives'].onlyIf { project.hasProperty('signing.keyId')}

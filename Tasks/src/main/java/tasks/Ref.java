@@ -1,18 +1,22 @@
 package tasks;
 
 /**
- * Created by Arash on 2/23/2015.
- */
-
-/**
- * wraps a value of type T. useful when shared state is needed while working with closures in java
+ * This class wraps a value of type T; useful when shared state is needed while working with closures in java
  */
 public class Ref<T> {
     public T value;
 
     public Ref() { }
 
+    /**
+     * sets the given parameter as the initial value
+     */
     public Ref(T value) {
         this.value = value;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Ref(%s)", String.valueOf(value));
     }
 }

@@ -1,8 +1,6 @@
-group 'net.s-arash'
-version '1.0-SNAPSHOT'
+version '0.2.0-SNAPSHOT'
 
 apply plugin: 'java'
-//apply plugin: 'idea'
 
 repositories {
     mavenCentral()
@@ -33,12 +31,11 @@ signing {
     sign configurations.archives
 }
 
-group = "net.s-arash"
-archivesBaseName = "tasksrx"
-version = "0.1.0-beta01"
-
 tasks['uploadArchives'].onlyIf { project.hasProperty('signing.keyId')}
 tasks['signArchives'].onlyIf { project.hasProperty('signing.keyId')}
+
+group = rootProject.group
+archivesBaseName = project.name.toLowerCase()
 
 uploadArchives {
     repositories {
@@ -57,7 +54,7 @@ uploadArchives {
                 name 'TasksRx'
                 packaging 'jar'
                 // optionally artifactId can be defined here
-                description 'A utility library for working with TaskJava and RxJava together'
+                description 'A utility library for working with Tasks and RxJava together'
                 url 'https://github.com/s-arash/TasksJava'
 
                 scm {

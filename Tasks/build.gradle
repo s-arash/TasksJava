@@ -1,4 +1,5 @@
 apply plugin: 'java'
+version "0.2.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -27,12 +28,11 @@ signing {
     sign configurations.archives
 }
 
-group = "net.s-arash"
-archivesBaseName = "tasks"
-version = "0.1.0-beta01"
-
 tasks['uploadArchives'].onlyIf { project.hasProperty('signing.keyId')}
 tasks['signArchives'].onlyIf { project.hasProperty('signing.keyId')}
+
+group = rootProject.group
+archivesBaseName = project.name.toLowerCase()
 
 uploadArchives {
     repositories {

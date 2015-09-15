@@ -1,13 +1,1 @@
 group 'net.s-arash'
-version '0.1.0-SNAPSHOT'
-
-apply plugin: 'maven'
-apply plugin: 'signing'
-
-tasks.each{ task ->
-    println 'evaluting ' + task.name + ' !!!'
-    if(task.name.contains("uploadArchives") || task.name.contains("signArchives")){
-        println 'Making $task.name conditional!'
-        task.onlyIf { project.hasProperty('signing.keyId')}
-    }
-}

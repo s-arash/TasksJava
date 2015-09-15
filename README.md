@@ -23,7 +23,7 @@ As you can see, this library makes it possible to write code pretty much like it
 
 
 
-For a more comprehensive overview of this libraryr, take a look at [**this introduction page**](https://github.com/s-arash/TasksJava/wiki/The-Tasks-Library).
+For a more comprehensive overview of this library, take a look at [**this introduction page**](https://github.com/s-arash/TasksJava/wiki/The-Tasks-Library).
 
 This library is for now, available in preview form:
 ###Tasks binary

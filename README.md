@@ -17,7 +17,7 @@ To get a taste of what this library looks like, take a look at this piece of cod
 
 This piece of code downloads the picture of a user and returns the saved path, all asynchronously using the *`Task<T>`* class.
 
- `Task<T>` is the heart of this library. It represents an operation that will finish at some point in the future, and produce a result of type `T`, *or* fail with an `Exception`. This is what you might know as a *Futue*.
+ `Task<T>` is the heart of this library. It represents an operation that will finish at some point in the future, and produce a result of type `T`, *or* fail with an `Exception`. This is what you might know as a [*Future*](https://en.wikipedia.org/wiki/Futures_and_promises).
 
 As you can see, this library makes it possible to write code pretty much like it is normal, synchronous code. Of course there is a lot more to this library than what is shown in the example above. There is support for loops, error handling and resource management, dealing with multuple concurrent async operations, controlling threading, creating `Task<T>` objects and more.
 

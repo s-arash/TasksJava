@@ -29,7 +29,7 @@ This library is for now, available in preview form:
 ###Tasks binary
 gradle:
 
-```compile 'net.s-arash:tasks:0.2.0```
+```compile 'net.s-arash:tasks:0.2.0'```
 
 maven:
 ```xml
@@ -44,7 +44,7 @@ TaskRx provides facilites to uset the Tasks library and RxJava together.
 
 gradle:
 
-```compile 'net.s-arash:tasksrx:0.2.0```
+```compile 'net.s-arash:tasksrx:0.2.0'```
 
 maven:
 ```xml
@@ -60,7 +60,7 @@ TasksAndroid provides useful android specific APIs for working with Tasks in and
 
 gradle:
 
-```compile 'net.s-arash:tasksandroid:0.2.0```
+```compile 'net.s-arash:tasksandroid:0.2.0'```
 
 maven:
 ```xml

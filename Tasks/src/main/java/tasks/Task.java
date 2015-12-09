@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static tasks.ArgumentValidation.elementsNotNull;
 import static tasks.ArgumentValidation.notNull;
+import static tasks.internal.Utils.getRuntimeException;
 
 /**
  * A class that represents asynchronous work. Tasks can either complete successfully or with an error.
@@ -378,6 +379,23 @@ public abstract class Task<T> {
         try {
             result();
         } catch (Exception ex) {
+        }
+    }
+
+    /**
+     * If the task has succeeded, returns its result, otherwise returns the provided {@code fallBackValue}.
+     * Unlike {@link this#result()}, this method never blocks for the result to become available.
+     * @param fallBackValue the value to return if the task has not succeeded.
+     */
+    public final T resultOr(T fallBackValue){
+        if(this.getState() == State.Succeeded){
+            try {
+                return this.result();
+            } catch (Exception e) {
+                throw getRuntimeException(e);
+            }
+        }else{
+            return fallBackValue;
         }
     }
 

@@ -5,6 +5,7 @@ import tasks.annotations.Experimental;
 import java.io.Closeable;
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -226,6 +227,7 @@ public abstract class Task<T> {
     /**
      * The finally block runs when the task is done.
      * The task returned by this method has the completion state and value of the original task.
+     *
      * @return a Task that runs finallyBlock after this Task is done, and retains the completion state of this Task
      * (unless finallyBlock fails, in which case it will fail with the same Exception)
      */
@@ -323,8 +325,9 @@ public abstract class Task<T> {
     }
 
     /**
-     * returns a Task that schedules its continuations on the given {@link Executor}.
-     * the given executor propagates to all the Tasks created from this Task (using then(), tryCatch(), and their siblings)
+     * returns a Task like this one, with the difference being that the returned Task will schedule its continuations on the given {@link Executor}.
+     * the given executor propagates to all the Tasks created from the returned Task (using then(), tryCatch(), and their siblings)
+     *
      * @return a Task that schedules its continuations on the given {@link Executor}.
      */
     public final Task<T> continueOn(Executor continuationExecutor) {
@@ -335,7 +338,8 @@ public abstract class Task<T> {
 
     /**
      * returns a Task that, if this Task does not complete in the amount of time given by {@code timeout} and {@code timeUnit}, fails with a {@link TaskTimeoutException}
-     * @param timeout the amount of time to wait before waiting with a {@link TaskTimeoutException}
+     *
+     * @param timeout  the amount of time to wait before waiting with a {@link TaskTimeoutException}
      * @param timeUnit the unit of {timeout}
      */
     @Experimental
@@ -353,11 +357,48 @@ public abstract class Task<T> {
 
     /**
      * returns a Task that, if this Task does not complete in the amount of time given by {@code timeoutMillis}, fails with a {@link TaskTimeoutException}
+     *
      * @param timeoutMillis the amount of time to wait before waiting with a {@link TaskTimeoutException}
      */
     @Experimental
     public final Task<T> withTimeout(final long timeoutMillis) {
         return withTimeout(timeoutMillis, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * returns a Task created from this Task that can be canceled by the given {@link CancellationToken}
+     * @param cancellationToken
+     * @return
+     */
+    @Experimental
+    public final Task<T> withCancellation(CancellationToken cancellationToken) {
+        final TaskBuilder<T> taskBuilder = new TaskBuilder<>(this.getContinuationExecutor());
+        this.registerCompletionCallback(new Action<Task<T>>() {
+            @Override
+            public void call(Task<T> tTask) throws Exception {
+                if (taskBuilder.getTask().isDone()) return;
+                try {
+                    if (getException() != null)
+                        taskBuilder.setException(getException());
+                    else
+                        taskBuilder.setResult(result());
+                } catch (UnsupportedOperationException ex) {
+                    //this means that the task was canceled. Don't need to do anything here.
+                }
+            }
+        });
+        cancellationToken.registerCanceledCallback(new Action<CancellationToken>() {
+            @Override
+            public void call(CancellationToken cancellationToken) throws Exception {
+                if (taskBuilder.getTask().isDone()) return;
+                try {
+                    taskBuilder.setException(new CancellationException());
+                } catch (UnsupportedOperationException ex) {
+                    //this means that the task was already completed. Don't need to do anything here.
+                }
+            }
+        });
+        return taskBuilder.getTask();
     }
 
     protected Executor getContinuationExecutor() {
@@ -385,16 +426,17 @@ public abstract class Task<T> {
     /**
      * If the task has succeeded, returns its result, otherwise returns the provided {@code fallBackValue}.
      * Unlike {@link this#result()}, this method never blocks for the result to become available.
+     *
      * @param fallBackValue the value to return if the task has not succeeded.
      */
-    public final T resultOr(T fallBackValue){
-        if(this.getState() == State.Succeeded){
+    public final T resultOr(T fallBackValue) {
+        if (this.getState() == State.Succeeded) {
             try {
                 return this.result();
             } catch (Exception e) {
                 throw getRuntimeException(e);
             }
-        }else{
+        } else {
             return fallBackValue;
         }
     }
@@ -513,6 +555,7 @@ public abstract class Task<T> {
     /**
      * returns a Task that completes when any of the give tasks complete (either successfully or in failure)
      * the returned task will contain the first finished task as its result
+     *
      * @return a Task that completes when any of the given Tasks is done, with that Task as its result
      */
     public static Task<Task<?>> whenAny(Task<?>... tasks) {
@@ -541,6 +584,7 @@ public abstract class Task<T> {
      * returns a Task that completes when any of the given tasks complete successfully.
      * the returned task will contain the first successfully completed task as its result. If none of the tasks complete successfully,
      * the returned task will fail with the exception of the last task of tasks failed.
+     *
      * @return a Task that completes when any of the given Tasks succeeds, with that Task as its result
      */
     public static Task<Task<?>> whenAnySucceeds(final Task<?>... tasks) {
@@ -628,6 +672,7 @@ public abstract class Task<T> {
 
     /**
      * the async equivalent of the for-each loop in Java
+     *
      * @return a Task that is the result of applying the body function to elements in {@code seq} in succession,
      * each task is created after the last one is completed
      */

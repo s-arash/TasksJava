@@ -6,6 +6,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 
 import static tasks.ArgumentValidation.notNull;
+
 /**
  * This class can be used to create {@link Task} objects whose completion results or exceptions can be manually set
  */
@@ -76,7 +77,6 @@ public class TaskBuilder<T> {
     }
 
     /**
-     *
      * @return the {@link Task} object whose completion status is controlled by this {@link TaskBuilder} instance
      */
     public Task<T> getTask() {
@@ -100,6 +100,7 @@ public class TaskBuilder<T> {
 
     /**
      * marks the Task given by this {@link TaskBuilder} instance as succeeded with the given result
+     * @throws UnsupportedOperationException if the task was already done
      */
     public void setResult(T result) {
         setExceptionOrResult(null, result);
@@ -107,10 +108,12 @@ public class TaskBuilder<T> {
 
     /**
      * marks the Task given by this {@link TaskBuilder} instance as failed with the given Exception
-     * @param exception
+     *
+     * @param exception the exception to set on the task
+     * @throws UnsupportedOperationException if the task was already done
      */
     public void setException(Exception exception) {
-        setExceptionOrResult(notNull(exception,"exception cannot be null"), null);
+        setExceptionOrResult(notNull(exception, "exception cannot be null"), null);
     }
 
     /**
@@ -134,7 +137,7 @@ public class TaskBuilder<T> {
      * Binds the completion result or Exception of the Task returned by this instance to the completion result of the given task
      */
     public void bindToATask(Task<T> task) {
-        notNull(task,"task cannot be null").registerCompletionCallback(new Action<Task<T>>() {
+        notNull(task, "task cannot be null").registerCompletionCallback(new Action<Task<T>>() {
             @Override
             public void call(Task<T> arg) throws Exception {
                 Task.State state = arg.getState();

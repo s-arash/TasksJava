@@ -61,7 +61,7 @@ public abstract class RetryPolicy {
             }
         }).then(new Function<Void, Task<T>>() {
             @Override
-            public Task<T> call(Void _) throws Exception {
+            public Task<T> call(Void __) throws Exception {
                 return resultingTask.value;
             }
         });

@@ -6,6 +6,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 
 import static tasks.ArgumentValidation.notNull;
+import static tasks.internal.Utils.getRuntimeException;
 
 /**
  * This class can be used to create {@link Task} objects whose completion results or exceptions can be manually set
@@ -18,6 +19,7 @@ public class TaskBuilder<T> {
     private Executor continuationExecutor;
 
     private LinkedList<Action<Task<T>>> continuations = new LinkedList<>();
+    private LinkedList<Action<Task<T>>> immediateContinuations = new LinkedList<>();
     private CountDownLatch resultSignal = new CountDownLatch(1);
     private final Object syncLock = new Object();
 
@@ -56,7 +58,7 @@ public class TaskBuilder<T> {
             public void registerCompletionCallback(Action<Task<T>> callback) {
                 //this if is for optimization
                 if (isDone) {
-                    callContinuation(callback);
+                    scheduleContinuation(callback);
                 } else {
                     boolean shouldCallContinuation = false;
                     synchronized (syncLock) {
@@ -65,7 +67,33 @@ public class TaskBuilder<T> {
                         else
                             continuations.add(callback);
                     }
-                    if (shouldCallContinuation) callContinuation(callback);
+                    if (shouldCallContinuation) scheduleContinuation(callback);
+                }
+            }
+
+            @Override
+            void registerImmediateCompletionCallback(Action<Task<T>> callback) {
+                if(isDone){
+                    try{
+                        callContinuation(callback);
+                    }catch (Exception ex){
+                        throw getRuntimeException(ex);
+                    }
+                }else{
+                    boolean shouldCallContinuation = false;
+                    synchronized (syncLock){
+                        if (isDone)
+                            shouldCallContinuation = true;
+                        else
+                            immediateContinuations.add(callback);
+                    }
+                    if(shouldCallContinuation) {
+                        try {
+                            callContinuation(callback);
+                        } catch (Exception ex) {
+                            throw getRuntimeException(ex);
+                        }
+                    }
                 }
             }
 
@@ -83,7 +111,7 @@ public class TaskBuilder<T> {
         return mTheTask;
     }
 
-    void callContinuation(final Action<Task<T>> callback) {
+    private void scheduleContinuation(final Action<Task<T>> callback) {
 
         continuationExecutor.execute(new Runnable() {
             @Override
@@ -96,6 +124,10 @@ public class TaskBuilder<T> {
                 }
             }
         });
+    }
+
+    private void callContinuation(Action<Task<T>> callback) throws Exception {
+        callback.call(mTheTask);
     }
 
     /**
@@ -128,16 +160,24 @@ public class TaskBuilder<T> {
                 resultSignal.countDown();
             } else throw new UnsupportedOperationException("The task is already completed.");
         }
+        while (! immediateContinuations.isEmpty()){
+            try{
+                callContinuation(immediateContinuations.remove());
+            }catch (Exception ex){
+                java.util.logging.Logger.getLogger("Tasks").severe("Exception in immediate task continuation: \r\n" + ex.getMessage());
+                ex.printStackTrace();
+            }
+        }
 
         while (!continuations.isEmpty())
-            callContinuation(continuations.remove());
+            scheduleContinuation(continuations.remove());
     }
 
     /**
      * Binds the completion result or Exception of the Task returned by this instance to the completion result of the given task
      */
     public void bindToATask(Task<T> task) {
-        notNull(task, "task cannot be null").registerCompletionCallback(new Action<Task<T>>() {
+        notNull(task, "task cannot be null").registerImmediateCompletionCallback(new Action<Task<T>>() {
             @Override
             public void call(Task<T> arg) throws Exception {
                 Task.State state = arg.getState();

@@ -32,17 +32,47 @@ public abstract class Task<T> {
     public abstract State getState();
 
     /**
+     * returns the value computed by this Task, or in the case of a Task that has failed, throws the exception.
+     * If the Task isn't done yet, blocks the current thread until it completes.
+     * NOTE: Use this method with caution, if the Task's completion depends on running code on the current thread's
+     * message queue, calling this method results in a deadlock
+     */
+    public abstract T result() throws Exception;
+
+    /**
+     * @return if the Task resulted in an {@link Exception}, returns the {@code Exception},
+     * otherwise (if it succeeded or it's not done yet) returns null
+     */
+    public abstract Exception getException();
+
+    /**
+     * registers the given callback to run on this Task's continuationExecutor when it completes.
+     */
+    public abstract void registerCompletionCallback(Action<Task<T>> callback);
+
+    /**
+     * registers the given callback to run immediately when this Task is done (without scheduling it
+     * on the continuationExecutor).
+     * The registered callback MUST be a short running action and not hog the thread!
+     */
+    abstract void registerImmediateCompletionCallback(Action<Task<T>> callback);
+
+    protected Executor getContinuationExecutor() {
+        return TaskSharedStuff.defaultExecutor;
+    }
+
+    /**
      * registers the given continuation to run when the current Task object is done, either successfully or in failure.
      *
      * @return a Task that is given by the continuation
      */
     public final <U> Task<U> continueWith(final Function<Task<T>, Task<U>> continuation) {
         notNull(continuation, "continuation cannot be null");
-        final TaskBuilder<U> continuationManualCompletion = new TaskBuilder<>(getContinuationExecutor());
+        final TaskBuilder<U> continuationTaskBuilder = new TaskBuilder<>(getContinuationExecutor());
         this.registerCompletionCallback(new Action<Task<T>>() {
             @Override
             public void call(final Task<T> arg) throws Exception {
-                continuationManualCompletion.bindToATaskFactory(new Callable<Task<U>>() {
+                continuationTaskBuilder.bindToATaskFactory(new Callable<Task<U>>() {
                     @Override
                     public Task<U> call() throws Exception {
                         return continuation.call(Task.this);
@@ -50,7 +80,7 @@ public abstract class Task<T> {
                 });
             }
         });
-        return continuationManualCompletion.getTask();
+        return continuationTaskBuilder.getTask();
     }
 
     /**
@@ -92,16 +122,16 @@ public abstract class Task<T> {
      */
     public final <U> Task<U> then(final Function<? super T, Task<U>> continuation) {
         notNull(continuation, "continuation cannot be null");
-        final TaskBuilder<U> continuationManualCompletion = new TaskBuilder<>(getContinuationExecutor());
+        final TaskBuilder<U> continuationTaskBuilder = new TaskBuilder<>(getContinuationExecutor());
 
         this.registerCompletionCallback(new Action<Task<T>>() {
             @Override
             public void call(final Task<T> arg) throws Exception {
                 State state = arg.getState();
                 if (state == State.Failed) {
-                    continuationManualCompletion.setException(arg.getException());
+                    continuationTaskBuilder.setException(arg.getException());
                 } else if (state == State.Succeeded) {
-                    continuationManualCompletion.bindToATaskFactory(new Callable<Task<U>>() {
+                    continuationTaskBuilder.bindToATaskFactory(new Callable<Task<U>>() {
                         @Override
                         public Task<U> call() throws Exception {
                             return continuation.call(arg.result());
@@ -110,7 +140,7 @@ public abstract class Task<T> {
                 } else throw new Exception("ERROR in then(). invalid task state");
             }
         });
-        return continuationManualCompletion.getTask();
+        return continuationTaskBuilder.getTask();
     }
 
     /**
@@ -401,18 +431,6 @@ public abstract class Task<T> {
         return taskBuilder.getTask();
     }
 
-    protected Executor getContinuationExecutor() {
-        return TaskSharedStuff.defaultExecutor;
-    }
-
-    /**
-     * returns the value computed by this Task, or in the case of a Task that has failed, throws the exception.
-     * If the Task isn't done yet, blocks the current thread until it completes.
-     * NOTE: Use this method with caution, if the Task's completion depends on running code on the current thread's
-     * message queue, calling this method results in a deadlock
-     */
-    public abstract T result() throws Exception;
-
     /**
      * blocks the current thread until this Task is done
      */
@@ -442,23 +460,12 @@ public abstract class Task<T> {
     }
 
     /**
-     * @return if the Task resulted in an {@link Exception}, returns the {@code Exception},
-     * otherwise (if it succeeded or it's not done yet) returns null
-     */
-    public abstract Exception getException();
-
-    /**
      * @return if the task has completed (either succeeded or failed) returns true, otherwise returns false
      */
     public final boolean isDone() {
         State state = this.getState();
         return state == State.Succeeded || state == State.Failed;
     }
-
-    /**
-     * registers the given callback to run on this Task's continuationExecutor when it completes.
-     */
-    public abstract void registerCompletionCallback(Action<Task<T>> callback);
 
     /**
      * converts the Task to a Future object
@@ -480,9 +487,6 @@ public abstract class Task<T> {
         return TaskFuture.toTask(future);
     }
 
-    private static Timer delayTimer = new Timer(false);
-
-
     /**
      * returns a task that completes after the given timeout. This is the {@link Thread#sleep(long)} of the async world!
      */
@@ -490,6 +494,7 @@ public abstract class Task<T> {
         return delay(notNull(timeUnit, "timeUnit cannot be null").toMillis(timeout));
     }
 
+    private static Timer delayTimer = new Timer(false);
     /**
      * returns a task that completes after the given timeout. This is the {@link Thread#sleep(long)} of the async world!
      */

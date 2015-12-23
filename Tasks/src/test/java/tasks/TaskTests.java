@@ -9,6 +9,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -386,6 +387,22 @@ public class TaskTests {
         for (int i = 0; i < input.size(); i++) {
             Assert.assertEquals(input.get(i) * input.get(i), (int) result.get(i));
         }
+    }
+
+    @Test
+    public void testReduce() throws Exception{
+        Task<Integer> task = Task.reduce(Arrays.asList(1, 2, 3, 4, 5), 0, new Function2<Integer, Integer, Task<Integer>>() {
+            @Override
+            public Task<Integer> call(final Integer a, final Integer b) throws Exception {
+                return Task.delay(new Random().nextInt(5)).then(new Function<Void, Task<Integer>>() {
+                    @Override
+                    public Task<Integer> call(Void __) throws Exception {
+                        return Task.fromResult(a + b);
+                    }
+                });
+            }
+        });
+        assertEquals((Integer) 15, task.result());
     }
 
     @Test

@@ -35,7 +35,7 @@ public class RetryPolicyTest {
 
     @Test
     public void testRun() throws Exception{
-        RetryPolicy retryPolicy = RetryPolicy.create(NumberFormatException.class, 2, 66);
+        RetryPolicy retryPolicy = RetryPolicy.create(2, 66, NumberFormatException.class);
         final Ref<Integer> remainingThrows = new Ref<>(2);
 
         StopWatch stopWatch = new StopWatch();
@@ -55,7 +55,7 @@ public class RetryPolicyTest {
 
     @Test
     public void testRunAsync() throws Exception {
-        RetryPolicy retryPolicy = RetryPolicy.create(NumberFormatException.class, 2, 50);
+        RetryPolicy retryPolicy = RetryPolicy.create(2, 50, NumberFormatException.class);
         Callable<Exception> numberFormatExceptionFactory = new Callable<Exception>() {
 
             @Override
@@ -93,7 +93,7 @@ public class RetryPolicyTest {
 
     @Test
     public void testCombine() throws Exception {
-        RetryPolicy retryPolicy = RetryPolicy.create(NumberFormatException.class, 2, 50).combine(RetryPolicy.create(TypeNotPresentException.class,4,30));
+        RetryPolicy retryPolicy = RetryPolicy.create(2, 50, NumberFormatException.class).combine(RetryPolicy.create(4, 30, TypeNotPresentException.class));
         final Exception[] exceptions = {
                 new TypeNotPresentException("Object!", new Exception()),
                 new NumberFormatException(),

@@ -4,8 +4,9 @@ package tasks;
  * This class wraps a value of type T; useful when shared state is needed while working with closures in java
  */
 public class Ref<T> {
-    public T value;
+    public volatile T value;
 
+    @Deprecated
     public Ref() { }
 
     /**

@@ -73,26 +73,18 @@ public class TaskBuilder<T> {
 
             @Override
             void registerImmediateCompletionCallback(Action<Task<T>> callback) {
-                if(isDone){
-                    try{
-                        callContinuation(callback);
-                    }catch (Exception ex){
-                        throw getRuntimeException(ex);
-                    }
-                }else{
+                if (isDone) {
+                    callContinuation(callback);
+                } else {
                     boolean shouldCallContinuation = false;
-                    synchronized (syncLock){
+                    synchronized (syncLock) {
                         if (isDone)
                             shouldCallContinuation = true;
                         else
                             immediateContinuations.add(callback);
                     }
-                    if(shouldCallContinuation) {
-                        try {
-                            callContinuation(callback);
-                        } catch (Exception ex) {
-                            throw getRuntimeException(ex);
-                        }
+                    if (shouldCallContinuation) {
+                        callContinuation(callback);
                     }
                 }
             }
@@ -126,12 +118,18 @@ public class TaskBuilder<T> {
         });
     }
 
-    private void callContinuation(Action<Task<T>> callback) throws Exception {
-        callback.call(mTheTask);
+    private void callContinuation(Action<Task<T>> callback) {
+        try {
+            callback.call(mTheTask);
+        } catch (Exception ex) {
+            java.util.logging.Logger.getLogger("Tasks").severe("Exception in immediate task continuation: \r\n" + ex.getMessage());
+            ex.printStackTrace();
+        }
     }
 
     /**
      * marks the Task given by this {@link TaskBuilder} instance as succeeded with the given result
+     *
      * @throws UnsupportedOperationException if the task was already done
      */
     public void setResult(T result) {
@@ -160,14 +158,8 @@ public class TaskBuilder<T> {
                 resultSignal.countDown();
             } else throw new UnsupportedOperationException("The task is already completed.");
         }
-        while (! immediateContinuations.isEmpty()){
-            try{
-                callContinuation(immediateContinuations.remove());
-            }catch (Exception ex){
-                java.util.logging.Logger.getLogger("Tasks").severe("Exception in immediate task continuation: \r\n" + ex.getMessage());
-                ex.printStackTrace();
-            }
-        }
+        while (!immediateContinuations.isEmpty())
+            callContinuation(immediateContinuations.remove());
 
         while (!continuations.isEmpty())
             scheduleContinuation(continuations.remove());

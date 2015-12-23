@@ -39,6 +39,16 @@ class CompletedTask<T> extends Task<T> {
     }
 
     @Override
+    void registerImmediateCompletionCallback(Action<Task<T>> callback) {
+        try {
+            callback.call(this);
+        } catch (Exception ex) {
+            java.util.logging.Logger.getLogger("Tasks").severe("Exception in immediate task continuation: \r\n" + ex.getMessage());
+            ex.printStackTrace();
+        }
+    }
+
+    @Override
     protected Executor getContinuationExecutor() {
         return _continuationExecutor;
     }
@@ -76,6 +86,16 @@ class FaultedTask<T> extends Task<T>{
     @Override
     public void registerCompletionCallback(Action<Task<T>> callback) {
         getContinuationExecutor().execute(TaskUtils.toRunnable(callback, this));
+    }
+
+    @Override
+    void registerImmediateCompletionCallback(Action<Task<T>> callback) {
+        try {
+            callback.call(this);
+        } catch (Exception ex) {
+            java.util.logging.Logger.getLogger("Tasks").severe("Exception in immediate task continuation: \r\n" + ex.getMessage());
+            ex.printStackTrace();
+        }
     }
 
     @Override

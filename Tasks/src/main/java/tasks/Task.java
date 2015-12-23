@@ -53,7 +53,9 @@ public abstract class Task<T> {
     /**
      * registers the given callback to run immediately when this Task is done (without scheduling it
      * on the continuationExecutor).
-     * The registered callback MUST be a short running action and not hog the thread!
+     * The registered callback MUST be a short running action and not hog the thread! It also should
+     * not throw any exceptions. Any exceptions thrown by the callback WILL BE SILENTLY SWALLOWED
+     * because the show must go on!
      */
     abstract void registerImmediateCompletionCallback(Action<Task<T>> callback);
 
@@ -331,27 +333,38 @@ public abstract class Task<T> {
 
     /**
      * returns a Task that bundles the results of the two tasks together in a {@link Pair}
-     *
      * @return a Task that holds the results of the two Tasks in a pair, or an Exception if any of the given tasks fails
      */
     public final <U> Task<Pair<T, U>> zip(final Task<U> other) {
-        return Task.whenAny(this, notNull(other, "other cannot be null")).then(new Function<Task<?>, Task<Pair<T, U>>>() {
+        return this.zip(other, new Function2<T, U, Pair<T, U>>() {
             @Override
-            public Task<Pair<T, U>> call(Task<?> task) throws Exception {
+            public Pair<T, U> call(T t, U u) throws Exception {
+                return new Pair<>(t, u);
+            }
+        });
+    }
+
+    /**
+     * returns a Task that bundles the results of the two tasks together using the given {@code zipper}
+     * @return a Task that holds the results of the two Tasks zipped together, or an Exception if any of the given tasks fails
+     */
+    public final <T2,TOut> Task<TOut> zip(final Task<T2> other, final Function2<T,T2,TOut> zipper){
+        return Task.whenAny(this, notNull(other, "other cannot be null")).then(new Function<Task<?>, Task<TOut>>() {
+            @Override
+            public Task<TOut> call(Task<?> task) throws Exception {
                 if (task.getState() == State.Failed) {
                     return Task.fromException(task.getException());
                 } else {
                     Task<?> unfinished = task == Task.this ? other : Task.this;
-                    return unfinished.then(new Function<Object, Task<Pair<T, U>>>() {
+                    return unfinished.then(new Function<Object, Task<TOut>>() {
                         @Override
-                        public Task<Pair<T, U>> call(Object o) throws Exception {
-                            return Task.fromResult(new Pair<T, U>(Task.this.result(), other.result()));
+                        public Task<TOut> call(Object o) throws Exception {
+                            return Task.fromResult(zipper.call(Task.this.result(), other.result()));
                         }
                     });
                 }
             }
         });
-
     }
 
     /**
@@ -398,7 +411,6 @@ public abstract class Task<T> {
     /**
      * returns a Task created from this Task that can be canceled by the given {@link CancellationToken}
      * @param cancellationToken
-     * @return
      */
     @Experimental
     public final Task<T> withCancellation(CancellationToken cancellationToken) {
@@ -738,6 +750,32 @@ public abstract class Task<T> {
             @Override
             public Task<List<TOut>> call(Void arg) throws Exception {
                 return Task.fromResult((List<TOut>) results);
+            }
+        });
+    }
+
+    /**
+     * using the async accumulator function, and the initial {@code seed},
+     * this method reduces the given sequence ({@code seq}) to a single value asynchronously.
+     * @return a {@link Task} that will hold the reduced value.
+     */
+    public static <T, TAcc> Task<TAcc> reduce(Iterable<? extends T> seq, TAcc seed, final Function2<TAcc,T,Task<TAcc>> accumulator){
+        final Ref<TAcc> acc = new Ref<>(seed);
+        return forEach(seq, new Function<T, Task<Void>>() {
+            @Override
+            public Task<Void> call(T t) throws Exception {
+                return accumulator.call(acc.value,t).thenSync(new Function<TAcc, Void>() {
+                    @Override
+                    public Void call(TAcc tAcc) throws Exception {
+                        acc.value = tAcc;
+                        return null;
+                    }
+                });
+            }
+        }).thenSync(new Function<Void, TAcc>() {
+            @Override
+            public TAcc call(Void __) throws Exception {
+                return acc.value;
             }
         });
     }

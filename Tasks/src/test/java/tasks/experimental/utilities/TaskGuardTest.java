@@ -33,6 +33,6 @@ public class TaskGuardTest{
         Assert.assertEquals((Integer)42,t1.result());
         Task<Integer> t3 = taskGuard.get();
         Assert.assertNotSame(t1,t3);
-        Assert.assertEquals((Integer)42,t1.result());
+        Assert.assertEquals((Integer)42,t3.result());
     }
 }

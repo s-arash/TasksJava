@@ -51,7 +51,7 @@ public class TaskGuard<T> {
     /**
      * resets the TaskGuard. After this call, calling {@link TaskGuard#get()} results in creating a new task.
      */
-    public synchronized void Reset(){
+    public synchronized void reset(){
         this.mTask = null;
     }
 

@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static tasks.ArgumentValidation.elementsNotNull;
 import static tasks.ArgumentValidation.notNull;
+import static tasks.internal.Utils.getRuntimeException;
 
 /**
  * A class that represents asynchronous work. Tasks can either complete successfully or with an error.
@@ -371,6 +372,25 @@ public abstract class Task<T> {
      */
     public abstract T result() throws Exception;
 
+
+    /**
+     * @return if the Task resulted in an {@link Exception}, returns the {@code Exception},
+     * otherwise (if it succeeded or it's not done yet) returns null
+     */
+    public abstract Exception getException();
+
+    public final T resultOr(T fallBackValue) {
+        if (this.getState() == State.Succeeded) {
+            try {
+                return this.result();
+            } catch (Exception e) {
+                throw getRuntimeException(e);
+            }
+        } else {
+            return fallBackValue;
+        }
+    }
+
     /**
      * blocks the current thread until this Task is done
      */
@@ -380,12 +400,6 @@ public abstract class Task<T> {
         } catch (Exception ex) {
         }
     }
-
-    /**
-     * @return if the Task resulted in an {@link Exception}, returns the {@code Exception},
-     * otherwise (if it succeeded or it's not done yet) returns null
-     */
-    public abstract Exception getException();
 
     /**
      * @return if the task has completed (either succeeded or failed) returns true, otherwise returns false

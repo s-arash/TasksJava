@@ -3,6 +3,8 @@ package tasks.experimental.utilities;
 
 import org.apache.commons.lang3.time.StopWatch;
 import org.junit.Test;
+import org.junit.matchers.JUnitMatchers;
+
 import tasks.Function;
 import tasks.Ref;
 import tasks.Task;
@@ -10,6 +12,8 @@ import tasks.Task;
 import java.util.Random;
 import java.util.concurrent.Callable;
 
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
 
 public class RetryPolicyTest {
@@ -35,7 +39,7 @@ public class RetryPolicyTest {
 
     @Test
     public void testRun() throws Exception{
-        RetryPolicy retryPolicy = RetryPolicy.create(NumberFormatException.class, 2, 66);
+        RetryPolicy retryPolicy = RetryPolicy.create(NumberFormatException.class, 2, 60);
         final Ref<Integer> remainingThrows = new Ref<>(2);
 
         StopWatch stopWatch = new StopWatch();
@@ -50,7 +54,8 @@ public class RetryPolicyTest {
             }
         });
         stopWatch.stop();
-        assertTrue(stopWatch.getTime() >= 2 * 66);
+        //multiply by 0.95 for indeterminate behavior
+        assertTrue("elapsed time (" + stopWatch.getTime() + ") must be >= 2 * 60" ,stopWatch.getTime() >= 0.95 * 2 * 60);
     }
 
     @Test

@@ -1,73 +1,111 @@
 package tasks.experimental.synchronization;
 
-import java.util.concurrent.Executor;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
+import tasks.Action;
 import tasks.Function;
 import tasks.Task;
 import tasks.TaskBuilder;
+import tasks.TaskUtils;
 
 /**
- * Created by sahebolamri on 12/26/2015.
+ * Provides an asynchronous synchronization mechanism, similar to Monitors.
+ * Designed to be used with {@link Task}s.
+ * the async equivalent of the following code:
+ *  <pre>{@code
+ *  Object lockObj = new Object();
+ *  ...
+ *  synchronized(lockObj){
+ *      addItem(x);
+ *  }}</pre>
+ *  would be something similar to this:
+ *  <pre>{@code
+ *  AsyncLock asyncLock = new AsyncLock();
+ *  ...
+ *  asyncLock.protect( () ->
+ *      addItemAsync(x));
+ *  }</pre>
+ *  where {@code addItemAsync()} returns a {@link Task} object.
  */
 public class AsyncLock {
 
-    private TaskBuilder<Void> currentLockTB = null;
+    private final Queue<TaskBuilder<LockHolder>> waiters = new ArrayDeque<>();
+    private volatile boolean isLockHeld = false;
     private volatile int currentLockId = 0;
-    private final Object internalSyncObj = new Object();
 
-    public Task<LockHolder> enter() {
-        TaskBuilder<Void> currentLockTBLocal = this.currentLockTB;
-        if (currentLockTBLocal != null) {
-            return currentLockTBLocal.getTask().then(new Function<Void, Task<LockHolder>>() {
-                @Override
-                public Task<LockHolder> call(Void aVoid) throws Exception {
-                    return enter();
-                }
-            });
-        } else {
-            synchronized (internalSyncObj) {
-                currentLockTBLocal = currentLockTB;
-                if (currentLockTBLocal == null) {
-                    this.currentLockTB = new TaskBuilder<>(immediateExecutor);
-                    return Task.fromResult(new LockHolder(currentLockId));
-                }
+    /**
+     * acquires the lock asynchronously. the returned {@link LockHolder} object's {@link LockHolder#release()} method MUST be called
+     * at some point after the lock has been acquired to release the lock.
+     * PLEASE consider using {@link AsyncLock#protect(Callable)} instead, to ensure that the acquired lock will be released.
+     * @return a Task that when done, means the lock has been acquired. The Task will contain a LockHolder
+     * object, whose {@link LockHolder#release()} method must be called to release the lock.
+     */
+    public Task<LockHolder> enter(){
+        synchronized (waiters) {
+            if (isLockHeld) {
+                TaskBuilder<LockHolder> waitTB = new TaskBuilder<LockHolder>();
+
+                waiters.add(waitTB);
+
+                return waitTB.getTask();
+            } else {
+                return Task.fromResult(holdLock());
             }
-            return currentLockTBLocal.getTask().then(new Function<Void, Task<LockHolder>>() {
-                @Override
-                public Task<LockHolder> call(Void aVoid) throws Exception {
-                    return enter();
-                }
-            });
         }
     }
 
+    private LockHolder holdLock(){
+        isLockHeld = true;
+        return new LockHolder(currentLockId);
+    }
 
-    public class LockHolder {
+    /**
+     * an object representing the lock held. MAKE SURE to call {@link LockHolder#release()} at some point.
+     */
+    public class LockHolder{
         private final int lockId;
 
         public LockHolder(int lockId) {this.lockId = lockId;}
 
-        public void release() {
-            TaskBuilder<Void> currentLock = null;
-            synchronized (AsyncLock.this.internalSyncObj) {
-                // if they are not equal, it means the lock has already been released, so we do nothing
-                if (this.lockId == AsyncLock.this.currentLockId) {
-                    AsyncLock.this.currentLockId++;
-                    currentLock = AsyncLock.this.currentLockTB;
-                    AsyncLock.this.currentLockTB = null;
+        /**
+         * releases the asynchronously acquired lock.
+         */
+        public void release(){
+            synchronized (waiters) {
+                if(lockId != AsyncLock.this.currentLockId){
+                    return;
+                }
+                AsyncLock.this.currentLockId ++;
+                TaskBuilder<LockHolder> holderTaskBuilder = waiters.poll();
+                if (holderTaskBuilder != null) {
+                    holderTaskBuilder.setResult(holdLock());
+                }else{
+                    isLockHeld = false;
                 }
             }
-            if (currentLock != null)
-                currentLock.setResult(null);
         }
+    }
 
+    public <T> Task<T> protect(final Callable<Task<T>> taskFactory){
+        return enter().then(new Function<LockHolder, Task<T>>() {
+            @Override
+            public Task<T> call(final LockHolder lockHolder) throws Exception {
+                return TaskUtils.fromFactory(taskFactory).tryFinallySync(new Action<Void>() {
+                    @Override
+                    public void call(Void __) throws Exception {
+                        lockHolder.release();
+                    }
+                });
+            }
+        });
 
     }
 
-    private static final Executor immediateExecutor = new Executor() {
-        @Override
-        public void execute(Runnable command) {
-            command.run();
-        }
-    };
+
 }

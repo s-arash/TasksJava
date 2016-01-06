@@ -443,22 +443,7 @@ public abstract class Task<T> {
         return taskBuilder.getTask();
     }
 
-    /**
-     * blocks the current thread until this Task is done
-     */
-    public final void waitForCompletion() {
-        try {
-            result();
-        } catch (Exception ex) {
-        }
-    }
 
-    /**
-     * If the task has succeeded, returns its result, otherwise returns the provided {@code fallBackValue}.
-     * Unlike {@link this#result()}, this method never blocks for the result to become available.
-     *
-     * @param fallBackValue the value to return if the task has not succeeded.
-     */
     public final T resultOr(T fallBackValue) {
         if (this.getState() == State.Succeeded) {
             try {
@@ -468,6 +453,16 @@ public abstract class Task<T> {
             }
         } else {
             return fallBackValue;
+        }
+    }
+
+    /**
+     * blocks the current thread until this Task is done
+     */
+    public final void waitForCompletion() {
+        try {
+            result();
+        } catch (Exception ex) {
         }
     }
 

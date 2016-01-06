@@ -4,6 +4,7 @@ import tasks.Function;
 import tasks.Ref;
 import tasks.Task;
 import tasks.TaskUtils;
+import tasks.internal.FunctionNoEx;
 import tasks.internal.Utils;
 
 import java.util.concurrent.Callable;
@@ -29,35 +30,35 @@ public abstract class RetryPolicy {
         final Ref<Task<T>> resultingTask = new Ref<>();
         final Ref<RetryPolicy> currentPolicy = new Ref<>(this);
         return Task.whileLoop(new Callable<Boolean>() {
-            @Override
-            public Boolean call() throws Exception {
-                return resultingTask.value == null;
-            }
-        }
+                                  @Override
+                                  public Boolean call() throws Exception {
+                                      return resultingTask.value == null;
+                                  }
+                              }
             , new Callable<Task<Void>>() {
-            @Override
-            public Task<Void> call() throws Exception {
-                return TaskUtils.fromFactory(taskFactory).continueWith(new Function<Task<T>, Task<Void>>() {
-                    @Override
-                    public Task<Void> call(Task<T> tTask) throws Exception {
-                        if (tTask.getState() == Task.State.Succeeded) {
-                            resultingTask.value = tTask;
-                        } else {
-                            HandleResult handleResult = currentPolicy.value.handle(tTask.getException());
-                            if (handleResult.shouldHandle) {
-                                currentPolicy.value = handleResult.nextPolicy;
-                                if (handleResult.waitTime > 0) {
-                                    return Task.delay(handleResult.waitTime);
-                                }
-                            } else {
+                @Override
+                public Task<Void> call() throws Exception {
+                    return TaskUtils.fromFactory(taskFactory).continueWith(new Function<Task<T>, Task<Void>>() {
+                        @Override
+                        public Task<Void> call(Task<T> tTask) throws Exception {
+                            if (tTask.getState() == Task.State.Succeeded) {
                                 resultingTask.value = tTask;
+                            } else {
+                                HandleResult handleResult = currentPolicy.value.handle(tTask.getException());
+                                if (handleResult.shouldHandle) {
+                                    currentPolicy.value = handleResult.nextPolicy;
+                                    if (handleResult.waitTime > 0) {
+                                        return Task.delay(handleResult.waitTime);
+                                    }
+                                } else {
+                                    resultingTask.value = tTask;
+                                }
                             }
+                            return Task.fromResult(null);
                         }
-                        return Task.fromResult(null);
-                    }
-                });
-            }
-        }).then(new Function<Void, Task<T>>() {
+                    });
+                }
+            }).then(new Function<Void, Task<T>>() {
             @Override
             public Task<T> call(Void __) throws Exception {
                 return resultingTask.value;
@@ -107,60 +108,49 @@ public abstract class RetryPolicy {
     }
 
     public static <T extends Exception> RetryPolicy create(int retryCount, int waitTimeMilliseconds, final Class<T> exceptionClass) {
-        return create(retryCount, waitTimeMilliseconds, new Function<Exception, Boolean>() {
-            @Override
-            public Boolean call(Exception e) throws Exception {
-                return exceptionClass.isInstance(e);
-            }
-        });
+        return create(retryCount,waitTimeMilliseconds,new Class[]{exceptionClass});
+
     }
 
-    public static <T extends Exception> RetryPolicy create(int retryCount, Function<Integer, Integer> waitTimeFunc, final Class<T> exceptionClass) {
-        return create(retryCount, waitTimeFunc, new Class[]{ exceptionClass});
+    public static <T extends Exception> RetryPolicy create(int retryCount, FunctionNoEx<Integer, Integer> waitTimeFunc, final Class<T> exceptionClass) {
+        return create(retryCount, waitTimeFunc, new Class[]{exceptionClass});
     }
 
-    public static RetryPolicy create(int retryCount, int waitTimeMilliseconds, final Function<Exception, Boolean> shouldHandle) {
-        return new SimpleRetryPolicy(waitTimeMilliseconds, retryCount) {
-            @Override
-            public boolean shouldHandle(Exception ex) {
-                try {
-                    return shouldHandle.call(ex);
-                } catch (Exception thrownException) {
-                    throw Utils.getRuntimeException(thrownException);
-                }
-            }
-        };
+    public static RetryPolicy create(int retryCount, int waitTimeMilliseconds, final FunctionNoEx<Exception, Boolean> shouldHandle) {
+        return new SimpleRetryPolicy(shouldHandle, waitTimeMilliseconds, retryCount);
     }
 
     /**
      * Creates a {@link RetryPolicy} object that retries {@code retryCount} times, with the wait time of {@code waitTimeMilliseconds} between them;
      * if the exceptions thrown are of a type found in {@code exceptionTypes}.
-     * @param retryCount the maximum number of time to retry
+     *
+     * @param retryCount           the maximum number of time to retry
      * @param waitTimeMilliseconds the time to wait between each retry
-     * @param exceptionTypes the list of exception types that RetryPolicy should keep retrying on.
+     * @param exceptionTypes       the list of exception types that RetryPolicy should keep retrying on.
      */
     @SafeVarargs
     public static RetryPolicy create(int retryCount, int waitTimeMilliseconds, final Class<? extends Exception>... exceptionTypes) {
-        return new SimpleRetryPolicy(waitTimeMilliseconds, retryCount) {
+        return new SimpleRetryPolicy(new FunctionNoEx<Exception, Boolean>() {
             @Override
-            public boolean shouldHandle(Exception ex) {
+            public Boolean call(Exception ex) {
                 return objectIsOfTypes(ex, exceptionTypes);
             }
-        };
+        }, waitTimeMilliseconds, retryCount);
     }
 
     /**
      * Creates a {@link RetryPolicy} object that retries {@code retryCount} times;
      * if the exceptions thrown are of a type found in {@code exceptionTypes}.
-     * @param retryCount the maximum number of time to retry
-     * @param waitTimeFunc the function that determines the time to wait based on the try number.
+     *
+     * @param retryCount     the maximum number of time to retry
+     * @param waitTimeFunc   the function that determines the time to wait based on the try number.
      * @param exceptionTypes the list of exception types that RetryPolicy should keep retrying on.
      */
     @SafeVarargs
-    public static RetryPolicy create(int retryCount, Function<Integer,Integer> waitTimeFunc, final Class<? extends Exception>... exceptionTypes) {
-        return create(retryCount, waitTimeFunc, new Function<Exception, Boolean>() {
+    public static RetryPolicy create(int retryCount, FunctionNoEx<Integer, Integer> waitTimeFunc, final Class<? extends Exception>... exceptionTypes) {
+        return create(retryCount, waitTimeFunc, new FunctionNoEx<Exception, Boolean>() {
             @Override
-            public Boolean call(Exception ex) throws Exception {
+            public Boolean call(Exception ex) {
                 return objectIsOfTypes(ex, exceptionTypes);
             }
         });
@@ -168,47 +158,43 @@ public abstract class RetryPolicy {
 
     /**
      * Creates a {@link RetryPolicy} object that retries a maximum of {@code retryCount} times;
-     * @param retryCount the maximum number of time to retry
+     *
+     * @param retryCount   the maximum number of time to retry
      * @param waitTimeFunc the function that determines the time to wait based on the try number.
      * @param shouldHandle a function that given an exception thrown, determines if the RetryPolicy object should keep retrying.
      */
-    public static RetryPolicy create(int retryCount, final Function<Integer,Integer> waitTimeFunc, final Function<Exception, Boolean> shouldHandle) {
-        return new SimpleRetryPolicy(0, retryCount) {
-            @Override
-            public boolean shouldHandle(Exception ex) {
-                try {
-                    return shouldHandle.call(ex);
-                } catch (Exception thrownException) {
-                    throw Utils.getRuntimeException(thrownException);
-                }
-            }
-
-            @Override
-            protected int getWaitTime(int attemptNo) {
-                try {
-                    return waitTimeFunc.call(attemptNo);
-                } catch (Exception e) {
-                    throw Utils.getRuntimeException(e);
-                }
-            }
-        };
+    public static RetryPolicy create(int retryCount, final FunctionNoEx<Integer, Integer> waitTimeFunc, final FunctionNoEx<Exception, Boolean> shouldHandle) {
+        return new SimpleRetryPolicy(shouldHandle, waitTimeFunc, retryCount);
     }
 
 
     static class SimpleRetryPolicy extends RetryPolicy {
 
         private final int mRetryCount;
-        private int mWaitTime;
         private int mAttemptNo = 1;
+        private FunctionNoEx<Integer, Integer> mWaitTimeFunc;
+        private FunctionNoEx<Exception, Boolean> mShouldHandleFunc;
 
-        SimpleRetryPolicy(int waitTime, int retryCount) {
-            this.mWaitTime = waitTime;
-            this.mRetryCount = retryCount;
+        SimpleRetryPolicy(FunctionNoEx<Exception, Boolean> shouldHandleFunc, final int waitTime, int retryCount) {
+            this(shouldHandleFunc, new FunctionNoEx<Integer, Integer>() {
+                @Override
+                public Integer call(Integer integer) {
+                    return waitTime;
+                }
+            }, retryCount);
+
         }
 
-        protected int getWaitTime(int attemptNo){
-            return mWaitTime;
-        };
+        SimpleRetryPolicy(FunctionNoEx<Exception, Boolean> shouldHandleFunc, FunctionNoEx<Integer, Integer> waitTimeFunc, int retryCount) {
+            mWaitTimeFunc = waitTimeFunc;
+            mRetryCount = retryCount;
+            mShouldHandleFunc = shouldHandleFunc != null ? shouldHandleFunc : new FunctionNoEx<Exception, Boolean>() {
+                @Override
+                public Boolean call(Exception e) {
+                    return true;
+                }
+            };
+        }
 
         public boolean shouldHandle(Exception ex) {
             return true;
@@ -216,29 +202,19 @@ public abstract class RetryPolicy {
 
         @Override
         public HandleResult handle(Exception ex) {
-            boolean shouldHandle = this.mRetryCount > 0 && shouldHandle(ex);
-            int waitTime = getWaitTime(this.mAttemptNo);
+            boolean shouldHandle = this.mRetryCount > 0 && mShouldHandleFunc.call(ex);
+            int waitTime = mWaitTimeFunc.call(this.mAttemptNo);
             final SimpleRetryPolicy thisRetryPolicy = this;
 
-            SimpleRetryPolicy nextPolicy = new SimpleRetryPolicy(mWaitTime, Math.max(0, mRetryCount - 1)) {
-                @Override
-                public boolean shouldHandle(Exception ex) {
-                    return thisRetryPolicy.shouldHandle(ex);
-                }
-
-                @Override
-                protected int getWaitTime(int attemptNo) {
-                    return thisRetryPolicy.getWaitTime(attemptNo);
-                }
-            };
+            SimpleRetryPolicy nextPolicy = new SimpleRetryPolicy(mShouldHandleFunc, mWaitTimeFunc, Math.max(0, mRetryCount - 1));
             nextPolicy.mAttemptNo = this.mAttemptNo + 1;
-            return new HandleResult(shouldHandle,waitTime,nextPolicy);
+            return new HandleResult(shouldHandle, waitTime, nextPolicy);
         }
     }
 
-    public static boolean objectIsOfTypes(Object object, final Class<?>... types){
-        for(Class<?> klass: types){
-            if(klass.isInstance(object)){
+    public static boolean objectIsOfTypes(Object object, final Class<?>... types) {
+        for (Class<?> klass : types) {
+            if (klass.isInstance(object)) {
                 return true;
             }
         }
